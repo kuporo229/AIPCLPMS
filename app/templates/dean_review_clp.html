@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Dean Review: {{ plan.subject }}{% endblock %}
+
+
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="bg-white p-8 rounded-xl shadow-md space-y-10">
+        <div class="border-b pb-4">
+            <h1 class="text-3xl font-bold text-gray-900">{{ content_data.descriptive_title or plan.subject }}</h1>
+            <p class="mt-1 text-lg text-gray-600">{{ plan.department }}</p>
+            <p class="mt-1 text-sm text-gray-500">Submitted by {{ plan.author.username }} on {{ plan.date_posted.strftime('%B %d, %Y') }}</p>
+            <p class="mt-1 text-sm text-gray-500">Current Status: <span class="font-semibold text-orange-500">{{ plan.status.replace('_', ' ').title() }}</span></p>
+
+            {# Download button logic #}
+            {% if plan.upload_type == 'file_upload' or plan.upload_type == 'ai_generated' %}
+                <a href="{{ url_for('teacher.download_clp', plan_id=plan.id) }}" class="inline-flex items-center mt-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M.001 6.88a2 2 0 011.603-1.995L4.417 4H15.58A2 2 0 0117.22 5.09l.33 1.995a2 2 0 01-1.603 1.995L15.583 10H4.417L.001 6.88zM4.417 12h11.166a2 2 0 001.603-1.995L17.22 8H2.78l-.33 1.995A2 2 0 004.417 12zM15 14H5a1 1 0 00-1 1v1a1 1 0 001 1h10a1 1 0 001-1v-1a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    Download Document
+                </a>
+            {% endif %}
+        </div>
+
+        {# Display Content if it's manual text or AI generated JSON #}
+        {% if plan.upload_type == 'manual_text' %}
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Learning Plan Content</h2>
+                <div class="prose max-w-none text-gray-700 whitespace-pre-wrap">{{ plan.content }}</div>
+            </section>
+        {% elif plan.upload_type == 'ai_generated' %}
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Course Information</h2>
+                <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                    <div><strong>Course Number:</strong> {{ content_data.course_number }}</div>
+                    <div><strong>Units:</strong> {{ content_data.units }}</div>
+                    <div><strong>Contact Hours:</strong> {{ content_data.Contact_hours_per_week }}</div>
+                    <div><strong>Type of Course:</strong> {{ content_data.type_of_course }}</div>
+                    <div><strong>Course Code:</strong> {{ content_data.course_code }}</div>
+                    <div><strong>Course Title:</strong> {{ content_data.course_title }}</div>
+                    <div><strong>Course Description:</strong> {{ content_data.course_description }}</div>
+                    <div><strong>Pre-requisite:</strong> {{ content_data.pre_requisite }}</div>
+                    <div><strong>Credit:</strong> {{ content_data.credit }}</div>
+                    <div><strong>Class Schedule:</strong> {{ content_data.class_schedule }}</div>
+                    <div><strong>Room Assignment:</strong> {{ content_data.room_assignment }}</div>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Program Outcomes and their Relationship to the Institutional Outcomes</h2>
+                <table class="min-w-full border-collapse border border-gray-300 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="table-cell header-cell">CODE</th>
+                            <th class="table-cell header-cell">BSIT PROGRAM OUTCOMES</th>
+                            <th class="table-cell header-cell" colspan="7">INSTITUTIONAL OUTCOMES</th>
+                        </tr>
+                        <tr>
+                            <th class="table-cell"></th>
+                            <th class="table-cell"></th>
+                            <th class="table-cell center-cell">T</th>
+                            <th class="table-cell center-cell">R</th>
+                            <th class="table-cell center-cell">I</th>
+                            <th class="table-cell center-cell">R</th>
+                            <th class="table-cell center-cell">I</th>
+                            <th class="table-cell center-cell">C</th>
+                            <th class="table-cell center-cell">H</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po in program_outcomes %}
+                        <tr>
+                            <td class="table-cell font-medium">{{ po.code }}</td>
+                            <td class="table-cell">{{ po.description }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_T', '') }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_R1', '') }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_I1', '') }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_R2', '') }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_I2', '') }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_C', '') }}</td>
+                            <td class="table-cell center-cell">{{ content_data.get(po.code + '_H', '') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Course Outcomes and their Relationship to the Program Outcomes</h2>
+                <table class="min-w-full border-collapse border border-gray-300 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="table-cell header-cell" rowspan="2">COURSE OUTCOMES</th>
+                            <th class="table-cell header-cell" colspan="13">PROGRAM OUTCOMES</th>
+                        </tr>
+                        <tr>
+                            {% for header in program_headers %}
+                                <th class="table-cell center-cell">{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for co in course_outcomes %}
+                            <tr>
+                                <td class="table-cell font-medium">{{ co.description }}</td>
+                                {% for po_header in program_headers %}
+                                    <td class="table-cell center-cell">{{ content_data.get(co.code + '_' + po_header, '') }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Course Outline</h2>
+                <table class="min-w-full border-collapse border border-gray-300 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="table-cell header-cell">Week</th>
+                            <th class="table-cell header-cell">Learning Outcomes (LO)</th>
+                            <th class="table-cell header-cell">Topic Outline (TO)</th>
+                            <th class="table-cell header-cell">Methodology</th>
+                            <th class="table-cell header-cell">Assessment</th>
+                            <th class="table-cell header-cell">Learning Resources (LR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i in range(1, 19) %}
+                        <tr class="bg-white">
+                            <td class="table-cell font-medium">{{ i }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_LO', '') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_TO', '') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_Method', '') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_Assesment', '') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_LR', '') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+        {% endif %}
+
+        <div class="mt-8 pt-4 border-t">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Dean's Review Actions</h2>
+            {% if plan.dean_comments %}
+                <div class="p-4 mb-4 text-sm text-red-800 bg-red-100 rounded-lg" role="alert">
+                    <span class="font-bold">Dean's Comments:</span> {{ plan.dean_comments }}
+                </div>
+            {% endif %}
+            <form method="post" action="{{ url_for('dean.dean_review_clp', plan_id=plan.id) }}">
+                {{ form.hidden_tag() }}
+                <div class="mb-4">
+                    {{ form.comments.label(class="block text-gray-700 text-sm font-bold mb-2") }}
+                    {{ form.comments(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500", rows="4") }}
+                </div>
+                <div class="flex space-x-4">
+                    {{ form.submit_approve(class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline cursor-pointer") }}
+                    {{ form.submit_return(class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline cursor-pointer") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

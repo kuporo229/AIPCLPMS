@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Dean - Faculty Management{% endblock %}
+
+
+{% block content %}
+<main class="py-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold leading-tight text-gray-900">
+                Faculty Management
+            </h1>
+            <p class="mt-1 text-lg text-gray-600">Overview of all registered faculty members (Teachers).</p>
+        </header>
+        
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Registered Teachers</h3>
+            {% if teachers %}
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for teacher in teachers %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ teacher.username }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if teacher.approved %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Approved</span>
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ teacher.role.title() }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-center text-gray-500 py-8">No teachers registered yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</main>
+{% endblock %}

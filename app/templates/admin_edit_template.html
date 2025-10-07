@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Edit CLP Template{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-8">
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold leading-tight text-gray-900">
+            Edit Course Learning Plan Template
+        </h1>
+        <p class="mt-2 text-gray-600">
+            Edit the official DOCX template used for AI-generated Course Learning Plans. All placeholders will be preserved.
+        </p>
+    </header>
+
+    <!-- Placeholders Reference Card -->
+    {% if placeholders %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">📝 Available Placeholders</h3>
+        <p class="text-sm text-blue-800 mb-3">These placeholders will be automatically replaced by the AI generator. DO NOT remove them:</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {% for placeholder in placeholders %}
+            <code class="bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs">{{ '{{' + placeholder + '}}' }}</code>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Editor Form -->
+    <div class="bg-white shadow-lg rounded-xl p-6 mb-8">
+        <form method="post" action="{{ url_for('admin.manage_template') }}" id="template-form">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Template Content
+                </label>
+                <textarea id="editor" name="content" class="hidden">{{ docx_html|safe }}</textarea>
+            </div>
+            
+            <div class="flex items-center justify-between pt-4 border-t">
+                <div class="flex space-x-3">
+                    <a href="{{ url_for('admin.download_template') }}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download Current Template
+                    </a>
+                </div>
+                
+                <button type="submit" id="save-button"
+                    class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Save Changes to Supabase
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Upload New Template Section -->
+    <div class="bg-white shadow-lg rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Upload New Template</h2>
+        <p class="text-gray-600 mb-4">
+            Alternatively, you can upload a completely new DOCX template file. This will replace the current template entirely.
+        </p>
+
+        <form method="post" action="{{ url_for('admin.upload_template') }}" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Select DOCX File
+                </label>
+                <input type="file" name="file" accept=".docx" required
+                       class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
+                <p class="mt-1 text-xs text-gray-500">Only .docx files are accepted</p>
+            </div>
+            
+            <button type="submit"
+                class="inline-flex items-center px-6 py-3 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                </svg>
+                Upload New Template
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- TinyMCE Editor -->
+<script src="https://cdn.tiny.cloud/1/b6cvh0f41m8xaowxpbl8gbcj79b0iu18vlir5c9wcmslbor1/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+    tinymce.init({
+        selector: '#editor',
+        height: 700,
+        menubar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | bold italic underline strikethrough | ' +
+                 'alignleft aligncenter alignright alignjustify | ' +
+                 'bullist numlist outdent indent | removeformat | table | code | help',
+        content_style: 'body { font-family: Arial, sans-serif; font-size: 11pt; }',
+        setup: function (editor) {
+            editor.on('change', function () {
+                tinymce.triggerSave();
+            });
+        },
+        // Preserve placeholders
+        protect: [
+            /\{\{[\s\S]*?\}\}/g  // Protect {{placeholder}} patterns
+        ]
+    });
+
+    // Ensure content is saved before submission
+    document.getElementById('template-form').addEventListener('submit', function(e) {
+        tinymce.triggerSave();
+        
+        // Show loading state
+        const saveButton = document.getElementById('save-button');
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...';
+    });
+</script>
+{% endblock %}

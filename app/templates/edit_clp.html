@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Plan{% endblock %}
+
+{% block navbar_links %}
+<a href="{{ url_for('teacher.teacher_my_clps') }}" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Back to Manage Courses</a>
+<a href="{{ url_for('auth.logout') }}" class="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">Logout</a>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold leading-tight text-gray-900">
+            Edit Course Learning Plan
+        </h1>
+        <p class="mt-1 text-lg text-gray-600">Modify the details or content of your learning plan.</p>
+    </header>
+    
+    <form method="post" action="{{ url_for('teacher.edit_clp', plan_id=plan.id) }}" enctype="multipart/form-data" class="bg-white p-8 rounded-xl shadow-md" novalidate>
+        {{ form.hidden_tag() }}
+        
+        <div class="space-y-6">
+            <div>
+                {{ form.department.label(class="block text-sm font-medium text-gray-700") }}
+                {{ form.department(class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md") }}
+                {% for error in form.department.errors %}
+                    <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+            <div>
+                {{ form.subject.label(class="block text-sm font-medium text-gray-700") }}
+                {{ form.subject(class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500") }}
+                {% for error in form.subject.errors %}
+                    <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <p class="font-semibold text-gray-800 mb-2">Current Content Type: {{ plan.upload_type.replace('_', ' ').title() }}</p>
+                {% if plan.upload_type == 'file_upload' %}
+                    <p class="text-sm text-gray-600 mb-3">Currently, this plan is stored as a file: <strong>{{ plan.filename }}</strong>. If you upload a new file, it will replace the old one. If you enter text below, the file will be removed and content will be stored as text.</p>
+                    <a href="{{ url_for('teacher.download_clp', plan_id=plan.id) }}" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Download Current File
+                    </a>
+                {% elif plan.upload_type == 'ai_generated' or plan.upload_type == 'manual_text' %}
+                    <p class="text-sm text-gray-600 mb-3">Currently, this plan is stored as text. You can edit the text below, or upload a new file to replace the text content.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                {{ form.content.label(class="block text-sm font-medium text-gray-700") }}
+                {{ form.content(class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500", rows="10", placeholder="Paste or type your updated course learning plan content here...") }}
+                {% for error in form.content.errors %}
+                    <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                {% endfor %}
+                <p class="mt-2 text-sm text-gray-500">Leaving this blank will retain existing text content, unless a new file is uploaded.</p>
+            </div>
+
+            <div class="text-center text-gray-500 text-sm">OR</div>
+
+            <div>
+                {{ form.file.label(class="block text-sm font-medium text-gray-700") }}
+                {{ form.file(class="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none") }}
+                {% for error in form.file.errors %}
+                    <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
+                {% endfor %}
+                <p class="mt-1 text-xs text-gray-500">Upload a new document (e.g., .docx, .pdf). This will replace any existing text content.</p>
+            </div>
+
+            <div>
+                {{ form.submit(class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer") }}
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

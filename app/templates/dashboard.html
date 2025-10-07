@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+
+
+{% block content %}
+<header>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 class="text-3xl font-bold leading-tight text-gray-900">
+            Welcome!
+        </h1>
+    </div>
+</header>
+<div class="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-8">
+     <div class="bg-white shadow-lg rounded-xl p-6">
+        <p>This is your personal dashboard. Content for your role ({{ session['role'] }}) will be displayed here.</p>
+     </div>
+</div>
+{% endblock %}
