@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Organize. Learn. Succeed.{% endblock %}
+
+{% block custom_nav %}
+<nav class="bg-white shadow-sm sticky top-0 z-10 landing-nav">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+            <h1 class="text-xl font-bold text-gray-700">AI-CLPMS</h1>
+            <div class="flex items-center space-x-2">
+                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="relative bg-white">
+    
+    <div class="hero-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+            
+            <div class="lg:col-span-1 pt-12">
+                <h1 class="text-5xl font-extrabold text-gray-900 sm:text-6xl mb-6">
+                    Organize. Learn. Succeed.
+                </h1>
+                <p class="mt-4 text-xl text-gray-600 max-w-lg">
+                    Take control of your learning journey with a smarter way to manage courses, track progress, and achieve your goals.
+                </p>
+
+                <div class="mt-8 flex space-x-4">
+                    <a href="{{ url_for('auth.signup') }}" class="w-auto px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                        REGISTER
+                    </a>
+                    <a href="{{ url_for('auth.login') }}" class="w-auto px-6 py-3 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                        LOG IN
+                    </a>
+                </div>
+            </div>
+            
+            <div class="lg:col-span-1 flex justify-center lg:justify-end">
+                
+            </div>
+        </div>
+    </div>
+    
+    <div class="learn-more-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            
+            <div class="lg:col-span-1 flex justify-center lg:order-2">
+                
+            </div>
+            
+            <div class="lg:col-span-1 lg:order-1 pt-4">
+                <p class="text-xs font-semibold uppercase text-gray-500 tracking-wider">
+                    LEARN MORE
+                </p>
+                <h2 class="text-3xl font-bold text-gray-900 mt-2 mb-4">
+                    Overview
+                </h2>
+                <p class="text-gray-600 leading-relaxed">
+                    The Course Learning Plan Management System helps instructors, students, and administrators streamline their teaching and learning journey. From creating structured course plans to tracking learning progress, everything is just a click away.
+                </p>
+                <p class="text-gray-600 leading-relaxed mt-4">
+                    With CLPMS, everything you need to plan, teach, and learn is brought together in one seamless platform. No more scattered documents, missed deadlines, or unclear objectives. It will be just a smarter, more connected way to move education forward.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

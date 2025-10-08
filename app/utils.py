@@ -281,13 +281,15 @@ def get_current_user_profile():
         return None
 
 # --- AI GENERATION BACKGROUND TASK (REFACTORED AND IMPROVED) ---
-def start_clp_generation(subject_name, department, user_id):
+def start_clp_generation(user_id, course_data):
     """A public function to start the background thread."""
-    thread = Thread(target=generate_clp_background_task, args=(current_app.app_context(), subject_name, department, user_id))
+    thread = Thread(target=generate_clp_background_task, args=(current_app.app_context(), user_id, course_data))
     thread.daemon = True
     thread.start()
 
-def generate_clp_background_task(app_context, subject_name, department, user_id):
+def generate_clp_background_task(app_context, user_id, course_data):
+    subject_name = course_data['subject']
+    department = course_data['department']
   
     with app_context:
         try:
@@ -297,58 +299,6 @@ def generate_clp_background_task(app_context, subject_name, department, user_id)
             clp_data = {}
             
             # --- Step 1: Generate Basic Info and References (Text Generation) ---
-            current_app.logger.info("--- [AI DEBUG] Step 1: Generating Basic Info and References... ---")
-            basic_info_prompt = f"""
-You are an expert academic planner for the College of Information Technology.
-Your task is to generate the Basic Course Information for the subject: "{subject_name}" in the Department of {department}.
-
-You MUST return a JSON object with the specified keys and no additional text, markdown, or conversational filler.
-The output MUST contain the following structure and all fields MUST be realistically populated.
-
-{{
-    "course_number": "ITXXX",
-    "descriptive_title": "{subject_name}",
-    "units": "X",
-    "Contact_hours_per_week": "X hours lecture + Y hours lab",
-    "type_of_course": "Lecture/Lab",
-    "course_code": "ITXXX",
-    "course_title": "{subject_name}",
-    "course_description": "A comprehensive description of the course.",
-    "pre_requisite": "None",
-    "credit": "X",
-    "class_schedule": "MWF 9:00 AM – 10:30 AM",
-    "room_assignment": "IT Building Room 203"
-}}
-"""
-            step1_generation_config = {
-                "response_mime_type": "application/json",
-                "response_schema": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "course_number": {"type": "STRING"},
-                        "descriptive_title": {"type": "STRING"},
-                        "units": {"type": "STRING"},
-                        "Contact_hours_per_week": {"type": "STRING"},
-                        "type_of_course": {"type": "STRING"},
-                        "course_code": {"type": "STRING"},
-                        "course_title": {"type": "STRING"},
-                        "course_description": {"type": "STRING"},
-                        "pre_requisite": {"type": "STRING"},
-                        "credit": {"type": "STRING"},
-                        "class_schedule": {"type": "STRING"},
-                        "room_assignment": {"type": "STRING"}
-                    },
-                    "required": ["course_number", "descriptive_title", "units", "Contact_hours_per_week", "type_of_course", "course_code", "course_title", "course_description", "pre_requisite", "credit", "class_schedule", "room_assignment"]
-                }
-            }
-            try:
-                response_basic = model_instance.generate_content(contents=[basic_info_prompt], generation_config=step1_generation_config)
-                clp_data.update(json.loads(response_basic.text))
-                current_app.logger.info("--- [AI DEBUG] Step 1: Basic Info generated successfully. ---")
-            except genai.types.generation_types.BlockedPromptException as e:
-                raise ValueError(f"AI generation failed (Blocked): {e.message}")
-            except Exception as e:
-                raise RuntimeError(f"AI generation failed (Step 1): {e}")
 
             # --- Step 2: Generate Program to Institutional Outcomes Mapping ---
             current_app.logger.info("--- [AI DEBUG] Step 2: Generating Program to Institutional Outcomes Mapping... ---")
@@ -463,6 +413,9 @@ Output ONLY a JSON object. Do NOT include any introductory or concluding remarks
                 raise ValueError(f"AI generation failed (Blocked): {e.message}")
             except Exception as e:
                 raise RuntimeError(f"AI generation failed (Step 4): {e}")
+            current_app.logger.info("--- [AI DEBUG] Injecting user-provided course data. ---")
+            clp_data.update(course_data)
+            
 
             # --- SUPABASE INTEGRATION START ---
             

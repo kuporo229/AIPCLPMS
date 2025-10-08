@@ -13,7 +13,8 @@ main_bp = Blueprint('main', __name__)
 def index():
     if 'user_id' in session:
         return redirect(url_for('main.dashboard'))
-    return redirect(url_for('auth.login'))
+    # Change: Render the new landing page instead of redirecting to login
+    return render_template('landing.html')
 
 
 @main_bp.route('/dashboard')

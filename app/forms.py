@@ -5,6 +5,9 @@ from flask_wtf.file import FileField, FileAllowed
 from wtforms import (StringField, PasswordField, SubmitField, SelectField,
                      TextAreaField, HiddenField, EmailField)
 from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Email, Optional
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField, SelectField, FileField, TextAreaField, IntegerField
+from wtforms.validators import DataRequired, Email, Length, Optional, NumberRange
 
 # app/forms.py
 
@@ -12,7 +15,27 @@ from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Email, Opt
 from wtforms import (StringField, PasswordField, SubmitField, SelectField,
                      TextAreaField, HiddenField, EmailField)
 from wtforms.validators import DataRequired, Length, EqualTo, Regexp, Email, Optional
+DEPARTMENT_CHOICES = [
+    ('Department of Information Technology', 'Department of Information Technology'),
+    ('Department of Engineering', 'Department of Engineering'),
+    ('Department of Business', 'Department of Business'),
+    ('Department of Arts and Sciences', 'Department of Arts and Sciences')
+]
 # ... existing forms ...
+class GenerateAIForm(FlaskForm):
+    department = SelectField('Department', choices=DEPARTMENT_CHOICES, validators=[DataRequired()])# Choices will be populated dynamically
+    course_code = StringField('Course Code', validators=[DataRequired(), Length(max=20)])
+    course_title = StringField('Course Title', validators=[DataRequired(), Length(max=255)])
+    course_description = TextAreaField('Course Description', validators=[DataRequired()])
+    type_of_course = StringField('Type of Course (e.g., Lecture, Laboratory)', validators=[DataRequired(), Length(max=50)])
+    unit = IntegerField('Unit', validators=[DataRequired(), NumberRange(min=1, max=10)])
+    pre_requisite = StringField('Pre-Requisite', validators=[Optional(), Length(max=100)])
+    co_requisite = StringField('Co-Requisite', validators=[Optional(), Length(max=100)])
+    credit = IntegerField('Credit', validators=[DataRequired(), NumberRange(min=0, max=10)]) # Could be float too
+    contact_hours_per_week = StringField('Contact Hours Per Week (e.g., 3 Lecture, 2 Lab)', validators=[DataRequired(), Length(max=50)])
+    class_schedule = StringField('Class Schedule (e.g., MWF 8:00 AM - 9:00 AM)', validators=[DataRequired(), Length(max=100)])
+    room_assignment = StringField('Room Assignment', validators=[Optional(), Length(max=50)])
+    submit = SubmitField('CREATE')
 
 # --- NEW FORM FOR ADMIN TEMPLATE EDITING ---
 class TemplateEditForm(FlaskForm):
@@ -35,7 +58,7 @@ class SignupForm(FlaskForm):
     title = StringField('Title (e.g., RMT, LPT, DIT, Ph.D.)', validators=[Optional(), Length(max=50)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=8, message="Password must be at least 8 characters long.")])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password', message='Passwords must match.')])
-    department = SelectField('Department (for Teachers)', choices=[('Department of Information Technology', 'Department of Information Technology'), ('Department of Engineering', 'Department of Engineering'), ('Department of Business', 'Department of Business'), ('Department of Arts and Sciences', 'Department of Arts and Sciences')], validators=[Optional()])
+    department = SelectField('Department (for Teachers)', choices=DEPARTMENT_CHOICES, validators=[Optional()])
     submit = SubmitField('Register Account')
 
 class ChangePasswordForm(FlaskForm):
@@ -45,8 +68,9 @@ class ChangePasswordForm(FlaskForm):
     submit = SubmitField('Change Password')
 
 class CLPUploadForm(FlaskForm):
-    department = SelectField('Department', choices=[('Department of Information Technology', 'Department of Information Technology'), ('Department of Engineering', 'Department of Engineering'), ('Department of Business', 'Department of Business'), ('Department of Arts and Sciences', 'Department of Arts and Sciences')], validators=[DataRequired()])
+    department = SelectField('Department', choices=DEPARTMENT_CHOICES, validators=[DataRequired()])
     subject = StringField('Subject Name', validators=[DataRequired(), Length(min=3, max=100)])
+
     content = TextAreaField('Course Learning Plan Content (Optional)')
     file = FileField('Upload CLP Document (Optional)', validators=[FileAllowed(['docx', 'pdf'], 'Only .docx and .pdf files are allowed!')])
     submit = SubmitField('Upload Plan')
@@ -56,7 +80,8 @@ class CLPUpdateForm(CLPUploadForm):
 
 class CLPGenerateForm(FlaskForm):
     subject_name = StringField('Subject Name', validators=[DataRequired(), Length(min=5, max=100)], render_kw={"placeholder": "e.g., Introduction to HCI"})
-    department = SelectField('Department', choices=[('Department of Information Technology', 'Department of Information Technology'), ('Department of Engineering', 'Department of Engineering'), ('Department of Business', 'Department of Business'), ('Department of Arts and Sciences', 'Department of Arts and Sciences')], validators=[DataRequired()])
+    department = SelectField('Department', choices=DEPARTMENT_CHOICES, validators=[DataRequired()])
+    
     submit = SubmitField('Generate with AI')
 
 class DeanReviewForm(FlaskForm):

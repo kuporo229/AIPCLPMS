@@ -15,10 +15,105 @@ from app.utils import create_notification
 from app.utils import secure_filename, datetime
 # Make sure to import it if it's not already there
 from app.utils import (allowed_file, get_current_user_profile,
-                       parse_supabase_timestamp, start_clp_generation, create_notification)
+                       parse_supabase_timestamp, start_clp_generation, create_notification,generate_clp_background_task,)
 # Create a Blueprint for teacher routes
+from app.forms import CLPUploadForm, GenerateAIForm 
+from app.forms import (CLPUploadForm, CLPGenerateForm, CLPUpdateForm,
+                       ChangePasswordForm, GenerateAIForm) 
 teacher_bp = Blueprint('teacher', __name__)
 
+
+@teacher_bp.route('/create_clp', methods=['GET', 'POST'])
+@login_required
+@roles_required(['teacher'])
+def create_clp():
+    upload_form = CLPUploadForm()
+
+    # Fetch departments for the form if needed (assuming departments exist in Supabase)
+    departments = []
+    try:
+        response = supabase.table('departments').select('id, name').execute()
+        departments = response.data
+    except Exception as e:
+        flash(f"Error fetching departments: {e}", "error")
+
+    # If the file upload form is submitted
+    if upload_form.validate_on_submit() and upload_form.upload_file.data:
+        file = upload_form.upload_file.data
+        if file:
+            filename = file.filename
+            user_id = session['user_id']
+            try:
+                # Assuming upload_file_to_supabase returns the URL
+                file_url = upload_file_to_supabase(file, f"clp_documents/{user_id}/{filename}")
+                
+                # Insert CLP record into database
+                supabase.table('course_learning_plans').insert({
+                    "teacher_id": user_id,
+                    "file_url": file_url,
+                    "file_name": filename,
+                    "status": "pending_dean_review",
+                    "generated_by_ai": False,
+                    "department_id": upload_form.department.data # Associate with department
+                }).execute()
+
+                flash("CLP uploaded successfully and pending dean review.", "success")
+                return redirect(url_for('teacher.index'))
+            except PostgrestAPIError as e:
+                flash(f"Database error: {e.message}", "error")
+            except Exception as e:
+                flash(f"Error uploading file: {e}", "error")
+    
+    # Render the page with the upload form and a link/button to the AI generation page
+    return render_template('teacher/create_clp.html', upload_form=upload_form, departments=departments)
+
+
+@teacher_bp.route('/create_clp_ai', methods=['GET', 'POST'])
+@login_required
+@roles_required('teacher')
+def create_clp_ai():
+    form = GenerateAIForm()
+    user_id = session.get('user_id')
+
+    # Fetch departments for the form (same as create_clp)
+    
+    if form.validate_on_submit():
+        if user_id:
+            try:
+                # 1. Collect ALL data from the form
+                course_data = {
+                    "department": dict(form.department.choices).get(form.department.data, form.department.data),
+                    "subject": form.course_title.data, # Using title as the main subject key
+                    
+                    # Collecting all other fields directly from the form
+                    "course_code": form.course_code.data,
+                    "course_title": form.course_title.data,
+                    "descriptive_title": form.course_title.data,
+                    "type_of_course": form.type_of_course.data,
+                    "units": str(form.unit.data), # Ensure it's a string to match AI output format
+                    "pre_requisite": form.pre_requisite.data,
+                    "co_requisite": form.co_requisite.data,
+                    "credit": str(form.credit.data), # Ensure it's a string
+                    "Contact_hours_per_week": form.contact_hours_per_week.data,
+                    "class_schedule": form.class_schedule.data,
+                    "room_assignment": form.room_assignment.data,
+                    # Note: course_description is not passed to the AI prompt, but we should save it if needed.
+                }
+
+                # --- FIX 1: Pass the entire course_data dictionary to the background task ---
+                # We need to update the signature of start_clp_generation and generate_clp_background_task
+                start_clp_generation(user_id, course_data) 
+                
+                flash("AI CLP generation started. You will be notified when it's ready.", "info")
+                return redirect(url_for('teacher.teacher_my_clps')) # Redirect to my_clps, the new dashboard after AI generation
+            except Exception as e:
+                # This catches errors that occur when starting the thread
+                flash(f"Error initiating AI generation: {e}", "danger")
+        else:
+            flash("User not logged in.", "danger")
+            return redirect(url_for('auth.login'))
+    
+    return render_template('create_clp_ai.html', form=form)
 
 @teacher_bp.route('/my_clps')
 @login_required
