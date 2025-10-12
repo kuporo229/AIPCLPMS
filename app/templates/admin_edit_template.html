@@ -1,126 +1,272 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ doc_title }}</title>
 
-{% block title %}Edit CLP Template{% endblock %}
+  <!-- ONLYOFFICE JS API - Load before any scripts that use it -->
+  <script src="http://localhost:8080/web-apps/apps/api/documents/api.js"></script>
 
-{% block content %}
-<div class="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-8">
-    <header class="mb-8">
-        <h1 class="text-3xl font-bold leading-tight text-gray-900">
-            Edit Course Learning Plan Template
-        </h1>
-        <p class="mt-2 text-gray-600">
-            Edit the official DOCX template used for AI-generated Course Learning Plans. All placeholders will be preserved.
-        </p>
-    </header>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body { 
+      height: 100vh; 
+      width: 100vw; 
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    
+    #editor { 
+      height: 100%; 
+      width: 100%; 
+    }
+    
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      font-size: 18px;
+      color: #666;
+    }
+    
+    #status {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 9999;
+      display: none;
+    }
+    
+    #status.show {
+      display: block;
+    }
+    
+    #status.success {
+      background: rgba(34, 139, 34, 0.9);
+    }
+    
+    #status.error {
+      background: rgba(220, 20, 60, 0.9);
+    }
 
-    <!-- Placeholders Reference Card -->
-    {% if placeholders %}
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-        <h3 class="text-lg font-semibold text-blue-900 mb-3">📝 Available Placeholders</h3>
-        <p class="text-sm text-blue-800 mb-3">These placeholders will be automatically replaced by the AI generator. DO NOT remove them:</p>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {% for placeholder in placeholders %}
-            <code class="bg-blue-100 text-blue-900 px-2 py-1 rounded text-xs">{{ '{{' + placeholder + '}}' }}</code>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
 
-    <!-- Editor Form -->
-    <div class="bg-white shadow-lg rounded-xl p-6 mb-8">
-        <form method="post" action="{{ url_for('admin.manage_template') }}" id="template-form">
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Template Content
-                </label>
-                <textarea id="editor" name="content" class="hidden">{{ docx_html|safe }}</textarea>
-            </div>
-            
-            <div class="flex items-center justify-between pt-4 border-t">
-                <div class="flex space-x-3">
-                    <a href="{{ url_for('admin.download_template') }}" 
-                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                        </svg>
-                        Download Current Template
-                    </a>
-                </div>
-                
-                <button type="submit" id="save-button"
-                    class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    Save Changes to Supabase
-                </button>
-            </div>
-        </form>
-    </div>
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Loading ONLYOFFICE Editor...</p>
+  </div>
+  <div id="status"></div>
+  <div id="editor"></div>
 
-    <!-- Upload New Template Section -->
-    <div class="bg-white shadow-lg rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Upload New Template</h2>
-        <p class="text-gray-600 mb-4">
-            Alternatively, you can upload a completely new DOCX template file. This will replace the current template entirely.
-        </p>
+  <script>
+    // Show status message
+    function showStatus(message, type = 'info') {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = message;
+      statusEl.className = 'show ' + type;
+      
+      setTimeout(() => {
+        statusEl.className = '';
+      }, 5000);
+    }
 
-        <form method="post" action="{{ url_for('admin.upload_template') }}" enctype="multipart/form-data" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Select DOCX File
-                </label>
-                <input type="file" name="file" accept=".docx" required
-                       class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none">
-                <p class="mt-1 text-xs text-gray-500">Only .docx files are accepted</p>
-            </div>
-            
-            <button type="submit"
-                class="inline-flex items-center px-6 py-3 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                </svg>
-                Upload New Template
-            </button>
-        </form>
-    </div>
-</div>
+    // Hide loading indicator
+    function hideLoading() {
+      const loadingEl = document.getElementById('loading');
+      if (loadingEl) {
+        loadingEl.style.display = 'none';
+      }
+    }
 
-<!-- TinyMCE Editor -->
-<script src="https://cdn.tiny.cloud/1/b6cvh0f41m8xaowxpbl8gbcj79b0iu18vlir5c9wcmslbor1/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
-<script>
-    tinymce.init({
-        selector: '#editor',
-        height: 700,
-        menubar: true,
-        plugins: [
-            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-            'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
-        ],
-        toolbar: 'undo redo | blocks | bold italic underline strikethrough | ' +
-                 'alignleft aligncenter alignright alignjustify | ' +
-                 'bullist numlist outdent indent | removeformat | table | code | help',
-        content_style: 'body { font-family: Arial, sans-serif; font-size: 11pt; }',
-        setup: function (editor) {
-            editor.on('change', function () {
-                tinymce.triggerSave();
-            });
-        },
-        // Preserve placeholders
-        protect: [
-            /\{\{[\s\S]*?\}\}/g  // Protect {{placeholder}} patterns
-        ]
-    });
+    // Test document URL accessibility
+    function testDocumentUrl(url) {
+      // Use the browser-accessible URL for testing
+      const testUrl = "{{ doc_url_test }}";
+      console.log("Testing document accessibility at:", testUrl);
+      
+      fetch(testUrl)
+        .then(response => {
+          if (response.ok) {
+            console.log('✅ Document URL is accessible from browser');
+            return response.blob();
+          } else {
+            console.error('❌ Document URL returned error:', response.status);
+            showStatus('Document URL not accessible: ' + response.status, 'error');
+          }
+        })
+        .then(blob => {
+          if (blob) {
+            console.log('✅ Document downloaded successfully, size:', blob.size, 'bytes');
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error fetching document:', error);
+          showStatus('Cannot reach document URL: ' + error.message, 'error');
+        });
+    }
 
-    // Ensure content is saved before submission
-    document.getElementById('template-form').addEventListener('submit', function(e) {
-        tinymce.triggerSave();
+    // Check if DocsAPI is loaded
+    function initEditor() {
+      if (typeof DocsAPI === 'undefined') {
+        console.error('DocsAPI is not defined. ONLYOFFICE script failed to load.');
+        showStatus('Failed to load ONLYOFFICE. Check if Document Server is running.', 'error');
+        document.getElementById('loading').innerHTML = 
+          '<p style="color: red;">❌ Failed to load ONLYOFFICE Document Server</p>' +
+          '<p style="font-size: 14px; margin-top: 10px;">Make sure ONLYOFFICE is running at http://localhost:8080</p>';
+        return;
+      }
+
+      console.log("Initializing ONLYOFFICE editor...");
+      
+      const docUrl = "{{ doc_url }}";
+      const callbackUrl = "{{ callback_url }}";
+      const docKey = "{{ doc_key }}";
+      const token = "{{ token }}";
+      
+      console.log("Configuration:");
+      console.log("  Document URL:", docUrl);
+      console.log("  Callback URL:", callbackUrl);
+      console.log("  Document Key:", docKey);
+      console.log("  JWT Enabled:", token ? "Yes" : "No");
+      
+      // Test if document is accessible
+      testDocumentUrl(docUrl);
+      
+      try {
+        // Build editor config
+        const editorConfig = {
+          document: {
+            title: "{{ doc_title }}",
+            url: docUrl,
+            fileType: "docx",
+            key: docKey,
+            permissions: {
+              edit: true,
+              download: true,
+              print: true,
+              review: true
+            }
+          },
+          documentType: "word",
+          editorConfig: {
+            mode: "edit",
+            callbackUrl: callbackUrl,
+            user: {
+              id: "admin",
+              name: "Admin User"
+            },
+            customization: {
+              autosave: true,
+              forcesave: true,
+              compactToolbar: false
+            }
+          },
+          events: {
+            onAppReady: function() {
+              console.log("📱 App is ready");
+            },
+            onDocumentReady: function() {
+              console.log("✅ Document is ready for editing");
+              hideLoading();
+              showStatus("Document loaded successfully", "success");
+            },
+            onError: function(event) {
+              console.error("❌ ONLYOFFICE error:", event);
+              console.error("Error details:", JSON.stringify(event, null, 2));
+              hideLoading();
+              
+              let errorMsg = "Unknown error";
+              if (event && event.data) {
+                if (typeof event.data === 'object') {
+                  errorMsg = JSON.stringify(event.data, null, 2);
+                } else {
+                  errorMsg = event.data;
+                }
+              }
+              
+              showStatus("Error: " + errorMsg, "error");
+              
+              // Show error in the loading div for better visibility
+              document.getElementById('loading').innerHTML = 
+                '<p style="color: red;">❌ ONLYOFFICE Error</p>' +
+                '<pre style="text-align: left; background: #f5f5f5; padding: 15px; border-radius: 5px; max-width: 600px; margin: 20px auto; font-size: 12px;">' + 
+                errorMsg + 
+                '</pre>';
+            },
+            onWarning: function(event) {
+              console.warn("⚠️ ONLYOFFICE warning:", event);
+              console.warn("Warning details:", JSON.stringify(event, null, 2));
+            },
+            onDocumentStateChange: function(event) {
+              console.log("📝 Document modified:", event.data);
+            },
+            onRequestSaveAs: function(event) {
+              console.log("💾 Save as requested:", event);
+            },
+            onInfo: function(event) {
+              console.log("ℹ️ Info:", event);
+            }
+          },
+          width: "100%",
+          height: "100%"
+        };
+
+        // Add JWT token if provided
+        if (token && token !== "None" && token !== "") {
+          editorConfig.token = token;
+          console.log("  JWT token added to config");
+        } else {
+          console.log("  No JWT token (running without authentication)");
+        }
+
+        console.log("Full editor config:", JSON.stringify(editorConfig, null, 2));
+
+        // Initialize ONLYOFFICE editor
+        const docEditor = new DocsAPI.DocEditor("editor", editorConfig);
+
+        console.log("✅ ONLYOFFICE editor initialized successfully");
         
-        // Show loading state
-        const saveButton = document.getElementById('save-button');
-        saveButton.disabled = true;
-        saveButton.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...';
-    });
-</script>
-{% endblock %}
+      } catch (error) {
+        console.error("❌ Error initializing editor:", error);
+        hideLoading();
+        showStatus("Failed to initialize editor: " + error.message, "error");
+      }
+    }
+
+    // Initialize when page loads
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initEditor);
+    } else {
+      initEditor();
+    }
+  </script>
+</body>
+</html>

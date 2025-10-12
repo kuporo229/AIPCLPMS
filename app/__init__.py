@@ -1,5 +1,3 @@
-# app/__init__.py
-
 import os
 import google.generativeai as genai
 from flask import (Flask, render_template, request, redirect, flash, jsonify, Response, current_app)
@@ -37,6 +35,7 @@ STORAGE_BUCKET_NAME = 'clp_files'
 ALLOWED_EXTENSIONS = {'docx', 'pdf'}
 
 def create_app():
+    
     global supabase, limiter
     
     app = Flask(__name__)
@@ -65,19 +64,6 @@ def create_app():
     supabase_service = create_client(app.config['SUPABASE_URL'], os.environ['SUPABASE_SERVICE_KEY'])  # service key
     app.config['SUPABASE_SERVICE'] = supabase_service
     
-    # --- FIX END ---
-    @app.after_request
-    def add_csp_headers(response):
-        response.headers['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.tiny.cloud; "
-            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com https://cdn.tiny.cloud; "
-            "font-src 'self' data: https://fonts.gstatic.com https://cdn.tiny.cloud; "
-            "img-src 'self' data: blob: https://cdn.tiny.cloud; "
-            "connect-src 'self' https://cdn.tiny.cloud;"
-        )
-        return response
-
     # Rate Limiter Configuration
     limiter = Limiter(
         get_remote_address,
@@ -107,30 +93,72 @@ def create_app():
     app.register_blueprint(dean_bp, url_prefix='/dean')
     app.register_blueprint(teacher_bp, url_prefix='/teacher')
 
-    # --- Request Hooks & Error Handlers ---
+    # --- CONSOLIDATED SECURITY HEADERS & CSP ---
     @app.after_request
     def add_security_headers(response):
+        # Cache control headers
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+        
+        # Security headers
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        
+        # Comprehensive Content Security Policy
+        # This CSP includes ONLYOFFICE support while maintaining security
         csp = (
-            "default-src 'self';"
-            "script-src 'self' https://cdn.tailwindcss.com;"
-            "style-src 'self' https://cdn.tailwindcss.com https://fonts.googleapis.com 'unsafe-inline';"
-            "font-src 'self' https://fonts.gstatic.com;"
-            "img-src 'self' data: blob:;"
-            f"connect-src 'self' https://generativelanguage.googleapis.com {app.config['SUPABASE_URL']};"
-            "object-src 'none';"
-            "frame-ancestors 'self';"
-            "form-action 'self';"
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+                "https://cdn.tailwindcss.com "
+                "https://cdn.tiny.cloud "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "style-src 'self' 'unsafe-inline' "
+                "https://cdn.tailwindcss.com "
+                "https://fonts.googleapis.com "
+                "https://cdn.tiny.cloud "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "font-src 'self' data: "
+                "https://fonts.gstatic.com "
+                "https://cdn.tiny.cloud "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "img-src 'self' data: blob: "
+                "https://cdn.tiny.cloud "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "connect-src 'self' "
+                "https://generativelanguage.googleapis.com "
+                f"{app.config['SUPABASE_URL']} "
+                "https://cdn.tiny.cloud "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080 "
+                "http://host.docker.internal:5000 "
+                "http://172.17.0.1:5000 "
+                "ws://localhost:8080 "
+                "ws://127.0.0.1:8080; "
+            "frame-src 'self' "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "worker-src 'self' blob: "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "child-src 'self' blob: "
+                "http://localhost:8080 "
+                "http://127.0.0.1:8080; "
+            "object-src 'none'; "
+            "frame-ancestors 'self'; "
+            "form-action 'self'; "
             "base-uri 'self';"
         )
         response.headers['Content-Security-Policy'] = csp
+        
         return response
 
+    # --- Error Handlers ---
     @app.errorhandler(403)
     def forbidden(e):
         return render_template('403.html'), 403
@@ -148,14 +176,5 @@ def create_app():
     def ratelimit_handler(e):
         flash("You have exceeded the rate limit. Please try again later.", "warning")
         return redirect(request.referrer or url_for('main.dashboard'))
-    
-    @app.after_request
-    def add_csp_headers(response):
-        response.headers['Content-Security-Policy'] = (
-            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.tiny.cloud; "
-            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
-            "img-src 'self' data: https://cdn.tiny.cloud;"
-    )
-        return response
 
     return app

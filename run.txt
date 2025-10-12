@@ -1,0 +1,5 @@
+run these first for local dev
+
+
+ngrok http 5000
+docker run -i -t -d -p 8080:80 -e JWT_ENABLED=false --name onlyoffice onlyoffice/documentserver
