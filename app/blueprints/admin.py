@@ -18,7 +18,7 @@ from datetime import datetime
 import jwt
 import time
 
-supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
+
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 # Configuration
