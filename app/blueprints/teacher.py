@@ -86,7 +86,7 @@ def create_clp_ai():
                     "subject": form.course_title.data, # Using title as the main subject key
                     
                     # Collecting all other fields directly from the form
-                    "course_code": form.course_code.data,
+                    "course_number": form.course_code.data,
                     "course_title": form.course_title.data,
                     "descriptive_title": form.course_title.data,
                     "type_of_course": form.type_of_course.data,

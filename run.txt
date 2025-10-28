@@ -2,4 +2,9 @@ run these first for local dev
 
 
 ngrok http 5000
+ngrok http 127.0.0.1:5000 for mac
+
+Windows: https://streamlike-fanny-nonstrategically.ngrok-free.dev
+Mac: https://unsprayable-rosa-prepueblo.ngrok-free.dev
+
 docker run -i -t -d -p 8080:80 -e JWT_ENABLED=false --name onlyoffice onlyoffice/documentserver
