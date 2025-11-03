@@ -50,6 +50,8 @@ def create_app():
     app.config['GEMINI_API_KEY'] = os.environ.get('GEMINI_API_KEY')
     app.config['SUPABASE_URL'] = os.environ.get('SUPABASE_URL')
     app.config['SUPABASE_KEY'] = os.environ.get('SUPABASE_KEY')
+    # Inside create_app():
+    app.config['ONLYOFFICE_JWT_SECRET'] = os.environ.get('ONLYOFFICE_JWT_SECRET', "")
     
     # Check for missing environment variables at startup.
     if not all([app.config['SECRET_KEY'], app.config['GEMINI_API_KEY'], app.config['SUPABASE_URL'], app.config['SUPABASE_KEY']]):

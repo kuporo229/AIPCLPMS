@@ -10,7 +10,10 @@ from google.generativeai import GenerativeModel
 from docx import Document
 from flask import current_app, session, flash, url_for, redirect, jsonify, Response
 import logging
-
+import jwt
+import time
+from flask import current_app
+import logging # Make sure logging is imported if not already
 from werkzeug.utils import secure_filename
 # Import the exception class from the library
 from supabase import PostgrestAPIError
@@ -138,7 +141,33 @@ def get_template_content():
         current_app.logger.error(f"Error reading DOCX: {e}")
         return f"ERROR: Could not read template content. Details: {e}"
 
+# Ensure logging is configured (add if not present)
+logger = logging.getLogger(__name__) # Or use current_app.logger if in request context
 
+# ONLYOFFICE JWT Secret - Fetched from config
+# ONLYOFFICE_JWT_SECRET = os.getenv("ONLYOFFICE_JWT_SECRET", "") # No longer needed here, use current_app.config
+
+def generate_jwt_token(payload):
+    """Generate JWT token for ONLYOFFICE if JWT secret is configured"""
+    onlyoffice_jwt_secret = current_app.config.get("ONLYOFFICE_JWT_SECRET", "")
+    if not onlyoffice_jwt_secret:
+        # current_app might not be available if called outside request context
+        # Use basic logging or handle appropriately
+        logger.warning("ONLYOFFICE_JWT_SECRET not set in app config - cannot generate token.")
+        return None
+
+    try:
+        # Add expiration time (e.g., 1 hour)
+        payload['exp'] = int(time.time()) + 3600
+        token = jwt.encode(payload, onlyoffice_jwt_secret, algorithm='HS256')
+        # Use logger instead of current_app.logger if outside request context
+        logger.info("Generated JWT token for ONLYOFFICE payload.")
+        return token
+    except Exception as e:
+        # Use logger instead of current_app.logger
+        logger.error(f"Error generating JWT: {e}")
+        return None
+    
 def _format_paragraph_with_images(para):
     """
     Converts a DOCX paragraph into HTML, scanning for images by walking the XML tree

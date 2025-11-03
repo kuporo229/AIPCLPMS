@@ -20,8 +20,306 @@ from app.utils import (allowed_file, get_current_user_profile,
 from app.forms import CLPUploadForm, GenerateAIForm 
 from app.forms import (CLPUploadForm, CLPGenerateForm, CLPUpdateForm,
                        ChangePasswordForm, GenerateAIForm) 
+# Add these imports at the top of teacher.py
+import jwt
+import time
+import requests
+import hashlib
+import platform # Added for host detection
+import traceback # Added for detailed error logging in callback
+from app.utils import generate_jwt_token # Import the function from utils
 teacher_bp = Blueprint('teacher', __name__)
 
+@teacher_bp.route('/clp/<int:plan_id>/edit_document')
+@login_required
+@roles_required('teacher')
+def edit_clp_document(plan_id):
+    plan_res = supabase.table('course_learning_plans').select('*').eq('id', plan_id).single().execute()
+    plan = plan_res.data
+
+    if not plan: abort(404)
+    if plan['user_id'] != session['user_id']: abort(403)
+    if plan['upload_type'] != 'file_upload' or not plan['filename'] or not plan['filename'].lower().endswith('.docx'):
+        flash('This plan is not a .docx document and cannot be edited with the document editor.', 'warning')
+        return redirect(url_for('teacher.view_clp', plan_id=plan_id))
+    # Optional: Check status if editing should be disallowed for pending/approved
+    # if plan['status'] in ['pending', 'approved']:
+    #     flash(f'This plan is currently "{plan["status"]}" and cannot be edited.', 'warning')
+    #     return redirect(url_for('teacher.teacher_my_clps'))
+
+    try:
+        # --- Key Generation ---
+        # Create a stable key based on plan ID and filename (or last modified time if available)
+        key_string = f"clp_{plan_id}_{plan['filename']}"
+        doc_key = hashlib.md5(key_string.encode()).hexdigest()
+
+        # --- Document URL ---
+        supabase_url = current_app.config.get("SUPABASE_URL")
+        storage_bucket = current_app.config.get("STORAGE_BUCKET_NAME")
+        # Assuming files require authentication (using proxy) or are public
+        # Option 1: Direct Public URL (Requires bucket/file to be public)
+        # doc_url_direct = f"{supabase_url}/storage/v1/object/public/{storage_bucket}/{plan['filename']}"
+
+        # Option 2: Flask Proxy URL (More secure if files aren't public)
+        # Determine host URL for ONLYOFFICE (from inside Docker or same network)
+        if platform.system() == "Windows":
+      # Use Docker Desktop's special DNS name for the host
+            onlyoffice_host = "http://host.docker.internal:5000"
+        elif platform.system() == "Darwin": # macOS
+            onlyoffice_host = "http://172.17.0.1:5000" # Also uses this often
+        else: # Linux - Default gateway IP for Docker bridge network
+      # This might need adjustment based on your specific Docker network setup
+            onlyoffice_host = "http://172.17.0.1:5000" # Common Docker bridge network IP
+
+        # Use the host from the browser request if not running in Docker or for testing
+        browser_host = request.host_url.rstrip('/')
+        if 'localhost' in browser_host or '127.0.0.1' in browser_host:
+             effective_host = browser_host # Use browser host if Flask is run locally
+        else:
+             effective_host = onlyoffice_host # Assume ONLYOFFICE needs the Docker host
+
+        # URL for ONLYOFFICE to fetch the document via Flask
+        # We need a new proxy route: /serve_clp/<plan_id>/<doc_key>
+        doc_url_proxy = f"{effective_host}/teacher/serve_clp/{plan_id}/{doc_key}"
+        # URL for browser testing the proxy route
+        doc_url_for_browser = f"{browser_host}/teacher/serve_clp/{plan_id}/{doc_key}"
+
+        # *** CHOOSE URL METHOD ***
+        # Set to True if Supabase bucket/files are public, False to use Flask proxy
+        use_direct_url = True
+        if use_direct_url:
+            supabase_url = current_app.config.get("SUPABASE_URL")
+            storage_bucket = current_app.config.get("STORAGE_BUCKET_NAME")
+            # Construct the public URL using the plan's filename
+            doc_url = f"{supabase_url}/storage/v1/object/public/{storage_bucket}/{plan['filename']}"
+            doc_url_test = doc_url # Test URL is the same
+            current_app.logger.info(f"Using direct Supabase public URL for CLP {plan_id}: {doc_url}")
+            # Determine host for callback separately (still needed)
+            ngrok_url = os.getenv("NGROK_URL", "")
+            if not ngrok_url:
+                # If no ngrok, callback still needs host accessible by ONLYOFFICE
+                if platform.system() == "Windows":
+                    effective_host_for_callback = "http://host.docker.internal:5000"
+                elif platform.system() == "Darwin": # macOS
+                    effective_host_for_callback = "http://host.docker.internal:5000"
+                else: # Linux
+                    effective_host_for_callback = "http://172.17.0.1:5000" # Or appropriate Docker IP
+            else:
+                effective_host_for_callback = ngrok_url # Ngrok handles callback accessibility
+        else:
+            # *** Use the determined onlyoffice_host for the proxy URL ***
+            doc_url = f"{onlyoffice_host}/teacher/serve_clp/{plan_id}/{doc_key}"
+            # Use the browser_host for the test URL the user's browser can access
+            doc_url_test = f"{browser_host}/teacher/serve_clp/{plan_id}/{doc_key}"
+            current_app.logger.info(f"Using Flask proxy URL for CLP {plan_id}. Editor Fetch URL: {doc_url}")
+            # Callback needs the same host as the proxy fetch URL
+            effective_host_for_callback = onlyoffice_host
+
+
+        # --- Callback URL ---
+        ngrok_url = os.getenv("NGROK_URL", "") # Check for ngrok URL first
+        if ngrok_url:
+            callback_url = f"{ngrok_url}/teacher/onlyoffice_clp_callback/{plan_id}/{doc_key}" # Include plan_id/key for identification
+            current_app.logger.info(f"Using ngrok callback URL: {callback_url}")
+        else:
+            callback_url = f"{effective_host}/teacher/onlyoffice_clp_callback/{plan_id}/{doc_key}"
+            current_app.logger.info(f"Using Docker/Local callback URL: {callback_url}")
+
+
+        # --- Editor Configuration ---
+        config = {
+            "document": {
+                "title": os.path.basename(plan['filename']).split('_', 1)[-1], # Cleaner title
+                "url": doc_url,
+                "fileType": "docx",
+                "key": doc_key,
+                "permissions": {
+                    "edit": True,
+                    "download": True, # Allow download from editor
+                    "print": True,
+                    "review": True
+                }
+            },
+            "documentType": "word",
+            "editorConfig": {
+                "mode": "edit",
+                "callbackUrl": callback_url,
+                "user": {
+                    # Use actual user ID and maybe username
+                    "id": str(session['user_id']),
+                    "name": session.get('username', 'Teacher')
+                },
+                "customization": {
+                    "autosave": True,
+                    "forcesave": True,
+                    "compactToolbar": False,
+                    # Add other customizations if needed
+                }
+            },
+             "width": "100%",
+             "height": "100%"
+        }
+
+        # Generate JWT token
+        token = generate_jwt_token(config) # Use the function from utils
+
+        current_app.logger.info(f"Rendering ONLYOFFICE for CLP ID: {plan_id}, Key: {doc_key}")
+        current_app.logger.info(f"Document URL (for Editor): {doc_url}")
+        current_app.logger.info(f"Document URL (for Browser Test): {doc_url_test}")
+        current_app.logger.info(f"Callback URL: {callback_url}")
+
+        return render_template(
+            "teacher_edit_document.html", # New template needed
+            doc_title=config["document"]["title"],
+            doc_url=doc_url,
+            doc_url_test=doc_url_test, # Pass the browser-testable URL
+            callback_url=callback_url,
+            doc_key=doc_key,
+            token=token,
+            # Pass the whole config if needed by template, otherwise pass specific parts
+            # config=json.dumps(config) # If passing the whole config
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Error initializing ONLYOFFICE editor for CLP {plan_id}: {e}", exc_info=True)
+        flash(f"Error loading document editor: {str(e)}", "danger")
+        return redirect(url_for('teacher.view_clp', plan_id=plan_id))
+    
+@teacher_bp.route('/serve_clp/<int:plan_id>/<doc_key>')
+# No login required - ONLYOFFICE fetches this directly
+def serve_clp_document(plan_id, doc_key):
+    """Serve a specific CLP document to ONLYOFFICE."""
+    try:
+        # Fetch plan details to get filename and verify ownership (optional but good)
+        # Using service client might be needed if RLS prevents direct access here
+        # supabase_service = current_app.config['SUPABASE_SERVICE']
+        # plan_res = supabase_service.table('course_learning_plans').select('filename, user_id').eq('id', plan_id).single().execute()
+        # For simplicity now, directly fetch using user client assuming RLS allows owned reads
+        plan_res = supabase.table('course_learning_plans').select('filename, user_id').eq('id', plan_id).single().execute()
+        plan = plan_res.data
+
+        if not plan or not plan.get('filename'):
+            current_app.logger.error(f"CLP {plan_id} or filename not found for serving.")
+            abort(404, description="Document not found")
+
+        # Optional: Verify doc_key consistency (e.g., re-generate and compare)
+        # key_string = f"clp_{plan_id}_{plan['filename']}"
+        # expected_key = hashlib.md5(key_string.encode()).hexdigest()
+        # if doc_key != expected_key:
+        #     current_app.logger.error(f"Invalid doc_key provided for CLP {plan_id}.")
+        #     abort(403, description="Invalid document key")
+
+        current_app.logger.info(f"Serving CLP {plan_id} (file: {plan['filename']}) with key: {doc_key}")
+
+        # Download from Supabase
+        file_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(plan['filename'])
+
+        if not file_bytes:
+            current_app.logger.error(f"File {plan['filename']} not found in Supabase storage for CLP {plan_id}")
+            abort(404, description="Document file not found in storage")
+
+        current_app.logger.info(f"Successfully downloaded CLP {plan_id}, size: {len(file_bytes)} bytes")
+
+        # Use original filename for download hint
+        download_filename = os.path.basename(plan['filename']).split('_', 1)[-1]
+
+        return Response(
+            file_bytes,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={
+                # Use original filename here
+                "Content-Disposition": f"inline; filename=\"{download_filename}\"",
+                "Content-Length": str(len(file_bytes)),
+                "Accept-Ranges": "bytes", # Important for ONLYOFFICE
+                "Cache-Control": "no-cache" # Prevent caching issues
+            }
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error serving CLP {plan_id}: {e}", exc_info=True)
+        abort(500, description=f"Error serving document: {str(e)}")
+    
+@teacher_bp.route('/onlyoffice_clp_callback/<int:plan_id>/<doc_key>', methods=['POST'])
+# No login required - ONLYOFFICE calls this directly
+def onlyoffice_clp_callback(plan_id, doc_key):
+    """Handle ONLYOFFICE save callback for teacher CLPs."""
+    try:
+        data = request.get_json()
+        if not data:
+            current_app.logger.error(f"Callback for CLP {plan_id} received no JSON data.")
+            return jsonify({"error": 1, "message": "No JSON data received"})
+
+        current_app.logger.info(f"ONLYOFFICE callback received for CLP {plan_id}, Key: {doc_key}, Data: {data}")
+
+        status = data.get("status")
+
+        # Verify the key from the callback matches the one in the URL
+        if data.get("key") != doc_key:
+             current_app.logger.error(f"Callback key mismatch for CLP {plan_id}. Expected {doc_key}, got {data.get('key')}")
+             return jsonify({"error": 1, "message": "Key mismatch"})
+
+        # Status 2 (ready for saving) or 6 (force save) means we need to update
+        if status in [2, 6]:
+            download_url = data.get("url")
+            if not download_url:
+                current_app.logger.error(f"No download URL in callback for CLP {plan_id}, Status: {status}")
+                return jsonify({"error": 1, "message": "Missing download URL"})
+
+            current_app.logger.info(f"Downloading updated document from ONLYOFFICE for CLP {plan_id}: {download_url}")
+
+            # Download updated file from ONLYOFFICE
+            response = requests.get(download_url, timeout=60) # Increased timeout
+            response.raise_for_status() # Raise exception for bad status codes
+            file_data = response.content
+
+            if not file_data:
+                 current_app.logger.error(f"Downloaded empty file from ONLYOFFICE for CLP {plan_id}")
+                 return jsonify({"error": 1, "message": "Downloaded empty file"})
+
+            current_app.logger.info(f"Downloaded {len(file_data)} bytes for CLP {plan_id}")
+
+            # Fetch the existing filename from the database
+            plan_res = supabase.table('course_learning_plans').select('filename, user_id').eq('id', plan_id).single().execute()
+            plan = plan_res.data
+            if not plan or not plan.get('filename'):
+                current_app.logger.error(f"Could not retrieve filename from database for CLP {plan_id} during callback.")
+                return jsonify({"error": 1, "message": "Could not find original plan or filename"})
+
+            # Use the existing filename path to update the file in Supabase
+            storage_path = plan['filename']
+            current_app.logger.info(f"Uploading updated file to Supabase Storage at path: {storage_path} for CLP {plan_id}")
+
+            result = supabase.storage.from_(STORAGE_BUCKET_NAME).update(
+                path=storage_path,
+                file=file_data,
+                file_options={"content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "upsert": "true"} # Use upsert true
+            )
+
+            current_app.logger.info(f"✅ Successfully updated CLP {plan_id} in Supabase Storage. Result: {result}")
+
+            # Optional: Update a 'last_edited' timestamp in the database table
+            # supabase.table('course_learning_plans').update({'last_edited': datetime.utcnow().isoformat()}).eq('id', plan_id).execute()
+
+            return jsonify({"error": 0}) # IMPORTANT: Return error 0 on success
+
+        elif status in [1, 4, 7]: # 1: editing, 4: closed no changes, 7: force save error
+            current_app.logger.info(f"Callback for CLP {plan_id}: Status {status} - No action needed.")
+            return jsonify({"error": 0})
+        else: # 0: key not found, 3: saving error
+            current_app.logger.error(f"Callback for CLP {plan_id}: Received error status {status}. Data: {data}")
+            return jsonify({"error": 1, "message": f"Received error status {status} from ONLYOFFICE"})
+
+    except requests.exceptions.RequestException as e:
+         current_app.logger.error(f"Network error during ONLYOFFICE callback for CLP {plan_id}: {e}", exc_info=True)
+         return jsonify({"error": 1, "message": f"Network error: {str(e)}"})
+    except PostgrestAPIError as e:
+        current_app.logger.error(f"Supabase API error during ONLYOFFICE callback for CLP {plan_id}: {e}", exc_info=True)
+        return jsonify({"error": 1, "message": f"Database error: {e.message}"})
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error in ONLYOFFICE callback for CLP {plan_id}: {e}", exc_info=True)
+        # Log detailed traceback
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"error": 1, "message": f"Internal server error: {str(e)}"})
+    
 
 @teacher_bp.route('/create_clp', methods=['GET', 'POST'])
 @login_required
