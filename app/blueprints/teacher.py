@@ -580,7 +580,7 @@ def generate_clp():
 
 @teacher_bp.route('/clp/<int:plan_id>')
 @login_required
-@roles_required('teacher', 'dean')
+@roles_required('teacher', 'dean', 'admin')
 def view_clp(plan_id):
     plan_res = supabase.table('course_learning_plans').select('*, author:users(*)').eq('id', plan_id).single().execute()
     plan = plan_res.data
@@ -608,7 +608,7 @@ def view_clp(plan_id):
 
 @teacher_bp.route('/clp/<int:plan_id>/download')
 @login_required
-@roles_required('teacher', 'dean')
+@roles_required('teacher', 'dean', 'admin')
 def download_clp(plan_id):
     plan_res = supabase.table('course_learning_plans').select('filename, upload_type').eq('id', plan_id).single().execute()
     plan = plan_res.data

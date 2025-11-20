@@ -324,28 +324,16 @@ def generate_clp_background_task(app_context, user_id, course_data):
         try:
             current_app.logger.info(f"--- [AI DEBUG] BG Task started for user {user_id}, subject '{subject_name}'. ---")
             
-            model_instance = GenerativeModel('gemini-2.5-flash')
+            model_instance = GenerativeModel('gemini-2.5-pro')
             clp_data = {}
             
             # --- Step 1: Generate Basic Info and References (Text Generation) ---
 
             # --- Step 2: Generate Program to Institutional Outcomes Mapping ---
             current_app.logger.info("--- [AI DEBUG] Step 2: Generating Program to Institutional Outcomes Mapping... ---")
-            po_io_prompt = f"""
-You are an expert academic planner. Your task is to map the alignment between BSIT Program Outcomes (PO) and Institutional Outcomes (IO) for an IT curriculum.
-
-IMPORTANT INSTRUCTIONS:
-1. For each Program Outcome (IT01–IT13) and Institutional Outcome (T, R1, I1, R2, I2, C, H), assign exactly one of these: "✔" or " ".
-2. The matrix MUST NOT be uniform (e.g., all "✔" or all " ").
-3. Your output MUST be a valid JSON object in the following format:
-{{
-    "IT01_T": "✔" or " ",
-    "IT01_R1": "✔" or " ",
-    ...
-    "IT13_H": "✔" or " "
-}}
-Output ONLY a JSON object with NO other text or markdown.
-"""
+            po_io_prompt_raw = get_system_prompt('prompt_po_io', default_text="You are an expert academic planner...") 
+        # No variables to format in this one typically, but good practice to allow it
+            po_io_prompt = po_io_prompt_raw
             po_io_schema_properties = {f"{po_code}_{io_header}": {"type": "STRING", "enum": ["✔", " "]} for po_code in PROGRAM_OUTCOMES_HEADERS for io_header in INSTITUTIONAL_OUTCOMES_HEADERS}
             step2_generation_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": po_io_schema_properties, "required": list(po_io_schema_properties.keys())}}
             try:
@@ -361,16 +349,8 @@ Output ONLY a JSON object with NO other text or markdown.
             current_app.logger.info("--- [AI DEBUG] Step 3: Generating Course to Program Outcomes Mapping... ---")
             course_outcomes_string = ", ".join([f"{co['code']}: {co['description']}" for co in COURSE_OUTCOMES])
             program_outcomes_string = ", ".join([f"{po['code']}: {po['description']}" for po in PROGRAM_OUTCOMES])
-            co_po_prompt = f"""
-Given the Course Outcomes (CO) and BSIT Program Outcomes (PO), determine the relationship for each pair.
-Course Outcomes: {course_outcomes_string}
-Program Outcomes: {program_outcomes_string}
-
-For each combination of CO and PO, assign "E" if it *Enables* the PO, "I" if it *Introduces* it, or " " for no alignment.
-Your output MUST be a JSON object with keys like 'L012_IT01' and values of "E", "I", or " ".
-
-Output ONLY a JSON object with NO other text or markdown.
-"""
+            co_po_prompt_raw = get_system_prompt('prompt_co_po', default_text="Given the Course Outcomes...")
+            co_po_prompt = co_po_prompt_raw.replace('{course_outcomes}', course_outcomes_string).replace('{program_outcomes}', program_outcomes_string)
             co_po_schema_properties = {f"{co_code_obj['code']}_{po_code}": {"type": "STRING", "enum": ["E", "I", " "]} for co_code_obj in COURSE_OUTCOMES for po_code in PROGRAM_OUTCOMES_HEADERS}
             step3_generation_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": co_po_schema_properties, "required": list(co_po_schema_properties.keys())}}
             try:
@@ -384,48 +364,8 @@ Output ONLY a JSON object with NO other text or markdown.
 
             # --- Step 4: Generate Weekly Breakdown ---
             current_app.logger.info("--- [AI DEBUG] Step 4: Generating Weekly Breakdown... ---")
-            weekly_breakdown_prompt = f"""
-You are an expert academic planner at the University of La Salette, Inc. for the College of Information Technology.
-Generate the complete 18-week Course Outline for the subject: "{subject_name}".
-
-You MUST generate a SINGLE, flat JSON object.
-This JSON object MUST contain the following 5 distinct keys for EACH of the 18 weeks (total 90 keys).
-Each key corresponds to a specific content type for that week.
-
-For single weeks (Weeks 1-9, 12-13, 18), use keys:
-- "Wn_LO" (Learning Outcomes for Week n)
-- "Wn_TO" (Topic Outline for Week n)
-- "Wn_Method" (Methodology for Week n)
-- "Wn_Assesment" (Assessment for Week n)
-- "Wn_LR" (Learning Resources for Week n)
-
-For COMBINED weeks, you MUST use these EXACT keys:
-- "W1011_LO", "W1011_TO", "W1011_Method", "W1011_Assesment", "W1011_LR"
-- "W1415_LO", "W1415_TO", "W1415_Method", "W1415_Assesment", "W1415_LR"
-- "W1617_LO", "W1617_TO", "W1617_Method", "W1617_Assesment", "W1617_LR"
-
-Every value associated with these keys MUST be a JSON string.
-You MUST use "\\n" for newlines and "• " for list items where appropriate WITHIN the string value.
-DO NOT INCLUDE ANY COMMENTS OR NON-JSON TEXT. All fields MUST be filled with realistic and relevant content.
-
-Additionally, at the end of the JSON object, add a key named "references" with a comprehensive list of all references. Format this list as a single string with distinct categories like "Website", "Textbook", "Journal".
-
-**You MUST STRICTLY follow this format for each week's content:**
-- The `Wn_LO` value MUST start with "At the end of the week, students should have the ability to:\\n".
-- The `Wn_TO` value MUST have the main topic followed by a list of sub-topics, all with bullet points.
-- The `Wn_Method` value MUST have a list of bulleted items.
-- The `Wn_Assesment` value MUST have a list of bulleted items.
-- The `Wn_LR` value MUST have a list of bulleted items, grouped by category like "Textbook", "Website", etc.
-
-**DETAILED EXAMPLE FOR ONE WEEK'S CONTENT:**
-- "W1_LO": "At the end of the week, students should have the ability to:\\n• Explain the University of La Salette vision, mission, core values, core competencies, institutional objectives and outcomes;\\n• Relate BSIT program educational outcomes to the institutional outcomes;"
-- "W1_TO": "Course Orientation\\n• University’s vision, mission, core values, core competencies, institutional objectives and institutional outcomes\\n• BSIT program description\\n• Course information"
-- "W1_Method": "• Interactive discussion\\n• Recitation on the university’s vision, mission, core values, core competencies, institutional objectives and institutional outcomes"
-- "W1_Assesment": "• Short quiz about the university policies\\n• Writing a reflective essay on the purpose of institutional outcomes in helping students become what they want to become\\n• Conceptualize a career plan aligned with BSIT program and core values of ULS"
-- "W1_LR": "Student Handbook\\nCHED CMO 25, series 2015 “PSG for IT Education”\\nCurriculum Guidelines for Baccalaureate Degree Programs in Information Technology (IT2017) of ACM and IEEE-CS\\nULS Official Website\\nhttps://uls.edu.ph"
-
-Output ONLY a JSON object. Do NOT include any introductory or concluding remarks, explanations, or markdown wrappers.
-"""
+            weekly_prompt_raw = get_system_prompt('prompt_weekly', default_text="Generate the complete 18-week Course Outline...")
+            weekly_breakdown_prompt = weekly_prompt_raw.replace('{subject_name}', subject_name)
             weekly_schema_properties = {}
             week_prefixes = [f"W{i}" for i in range(1, 19) if i not in [10, 11, 14, 15, 16, 17]] + ["W1011", "W1415", "W1617"]
             for week_prefix in week_prefixes:
@@ -475,15 +415,56 @@ Output ONLY a JSON object. Do NOT include any introductory or concluding remarks
             new_clp = inserted_plan_res.data[0]
             new_clp_id = new_clp['id']
             
-            current_app.logger.info(f"--- [AI DEBUG] BG Task: Generating .docx file for CLP ID: {new_clp_id}... ---")
-            TEMPLATE_KEY = "PBSIT/PBSIT-001-LP-20242.docx"
+            # --- DYNAMIC TEMPLATE SELECTION ---
+            current_app.logger.info(f"--- [AI DEBUG] Selecting template for department: {department} ---")
+            
+            template_key = None
+            
             try:
-    # Download template bytes from Supabase
-                template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(TEMPLATE_KEY)
+                # 1. Try to find a template specifically assigned to this department name
+                # We need the department ID first, or we search by joined name if Supabase allows, 
+                # but simpler to search 'templates' where department_id matches the department name look up.
+                
+                # First, look up the department ID from the 'departments' table using the name passed in course_data
+                dept_res = supabase.table('departments').select('id').eq('name', department).execute()
+                
+                if dept_res.data:
+                    dept_id = dept_res.data[0]['id']
+                    # Now find a template with this dept_id
+                    tmpl_res = supabase.table('templates').select('filename').eq('department_id', dept_id).limit(1).execute()
+                    if tmpl_res.data:
+                        template_key = tmpl_res.data[0]['filename']
+                        current_app.logger.info(f"--- [AI DEBUG] Found department-specific template: {template_key} ---")
+
+                # 2. If no department specific template, find the Global Default
+                if not template_key:
+                    def_res = supabase.table('templates').select('filename').eq('is_default', True).limit(1).execute()
+                    if def_res.data:
+                        template_key = def_res.data[0]['filename']
+                        current_app.logger.info(f"--- [AI DEBUG] Using global default template: {template_key} ---")
+
+                # 3. Fallback to the old hardcoded one if DB is empty (Safety net)
+                if not template_key:
+                    template_key = "PBSIT/PBSIT-001-LP-20242.docx" 
+                    current_app.logger.info("--- [AI DEBUG] No DB template found. Using legacy hardcoded fallback. ---")
+
+                # --- DOWNLOAD THE SELECTED TEMPLATE ---
+                current_app.logger.info(f"--- [AI DEBUG] Downloading template file: {template_key} ---")
+                template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(template_key)
+                
                 if not template_bytes:
-                    raise FileNotFoundError(f"Critical Error: Template '{TEMPLATE_KEY}' not found in Supabase Storage.")
+                    raise FileNotFoundError(f"Template file '{template_key}' listed in DB but not found in Storage.")
+                    
             except Exception as e:
-                raise FileNotFoundError(f"Critical Error: Could not fetch template from Supabase. {e}")
+                 # Fallback to hardcoded if DB query fails entirely
+                 current_app.logger.error(f"Template selection failed: {e}")
+                 # Attempt one last fallback
+                 template_key = "PBSIT/PBSIT-001-LP-20242.docx"
+                 template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(template_key)
+
+            # Create Document object from bytes
+            
+            
             doc = Document(io.BytesIO(template_bytes))
 
 # Replace placeholders
@@ -532,3 +513,14 @@ Output ONLY a JSON object. Do NOT include any introductory or concluding remarks
             # Log the full exception for detailed debugging
             current_app.logger.error("Error on line {}: {}".format(sys.exc_info()[-1].tb_lineno, e))
             create_notification(user_id, f'CLP generation for "{subject_name}" failed unexpectedly. An administrator has been notified.')
+
+def get_system_prompt(key, default_text=""):
+    try:
+        # Fetch from DB
+        res = supabase.table('system_settings').select('value').eq('key', key).single().execute()
+        if res.data:
+            return res.data['value']
+    except Exception as e:
+        current_app.logger.error(f"Error fetching prompt '{key}': {e}")
+    # Fallback to default if DB fails
+    return default_text

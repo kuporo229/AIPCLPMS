@@ -2,7 +2,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from supabase import PostgrestAPIError
 from app import supabase
 from app.decorators import login_required, roles_required, admin_required
-from app.forms import ApproveUserForm, TemplateEditForm
 from werkzeug.utils import secure_filename
 import re
 from docx import Document
@@ -17,7 +16,8 @@ import requests
 from datetime import datetime
 import jwt
 import time
-
+from app.forms import ApproveUserForm, TemplateEditForm, EditUserForm, DepartmentForm, TemplateUploadForm, SystemSettingsForm
+from app.utils import parse_supabase_timestamp # Add this to imports
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -136,73 +136,61 @@ def debug_onlyoffice():
     return jsonify(debug_info)
 
 
-@admin_bp.route('/manage_template')
+# ... existing imports ...
+
+# --- NEW: Dynamic Template Editing ---
+
+@admin_bp.route('/templates/edit/<int:template_id>')
 @login_required
-@admin_required
-def manage_template():
-    """Open the DOCX in ONLYOFFICE editor."""
+@roles_required('admin')
+def edit_template(template_id):
+    """Open a specific template in ONLYOFFICE editor."""
     try:
-        # Get file metadata from Supabase to generate a consistent key
-        file_info = supabase.storage.from_(STORAGE_BUCKET_NAME).list(path="PBSIT")
+        # 1. Fetch template details from DB
+        res = supabase.table('templates').select('*').eq('id', template_id).single().execute()
+        template = res.data
         
-        # Find our specific file
-        template_file = next((f for f in file_info if f['name'] == 'PBSIT-001-LP-20242.docx'), None)
-        
-        if template_file and 'updated_at' in template_file:
-            # Create a stable key based on file path and last modified time
-            import hashlib
-            key_string = f"{TEMPLATE_KEY}_{template_file['updated_at']}"
-            doc_key = hashlib.md5(key_string.encode()).hexdigest()
-        else:
-            # Fallback: use a fixed key for this template
-            import hashlib
-            doc_key = hashlib.md5(TEMPLATE_KEY.encode()).hexdigest()
-        
-        # OPTION 1: Use Supabase public URL (simpler, works immediately)
-        # Make sure your bucket/file has public access enabled
+        if not template:
+            flash("Template not found.", "danger")
+            return redirect(url_for('admin.manage_templates'))
+
+        filename = template['filename'] # e.g., "templates/17154..._MyTemplate.docx"
+        doc_title = template['name']
+
+        # 2. Generate a stable document key
+        # We use ID and filename. If you had a 'last_modified' field, you'd append that too.
+        import hashlib
+        key_string = f"tmpl_{template['id']}_{filename}"
+        doc_key = hashlib.md5(key_string.encode()).hexdigest()
+
+        # 3. Construct Document URL (Direct Supabase Public URL)
         supabase_url = os.getenv("SUPABASE_URL")
-        doc_url_direct = f"{supabase_url}/storage/v1/object/public/{STORAGE_BUCKET_NAME}/{TEMPLATE_KEY}"
+        # Ensure this matches your actual bucket name variable
+        doc_url = f"{supabase_url}/storage/v1/object/public/{STORAGE_BUCKET_NAME}/{filename}"
+
+        # 4. Construct Callback URL
+        # ONLYOFFICE needs to hit this URL to save changes.
+        ngrok_url = os.getenv("NGROK_URL", "")
         
-        # OPTION 2: Use Flask proxy (more control, but needs networking setup)
-        # Determine host URL for ONLYOFFICE (from inside Docker)
-        if platform.system() == "Windows":
-            onlyoffice_host = "http://host.docker.internal:5000"
-        else:
-            onlyoffice_host = "http://172.17.0.1:5000"
-        
-        # Get the actual host for browser requests
-        browser_host = request.host_url.rstrip('/')
-        if not browser_host or browser_host == 'http://':
-            browser_host = "http://localhost:5000"
-        
-        # Document URLs
-        doc_url_proxy = f"{onlyoffice_host}/admin/serve_document/{doc_key}"
-        doc_url_for_browser = f"{browser_host}/admin/serve_document/{doc_key}"
-        
-        # CHOOSE WHICH METHOD TO USE
-        # Start with direct Supabase URL - it's simpler and should work immediately
-        use_direct_url = True  # Change to False to use Flask proxy
-        
-        if use_direct_url:
-            doc_url = doc_url_direct
-            current_app.logger.info("Using direct Supabase URL")
-        else:
-            doc_url = doc_url_proxy
-            current_app.logger.info("Using Flask proxy URL")
-        
-        # Callback URL for saving
-        ngrok_url = os.getenv("NGROK_URL", "")  # e.g., "https://abc123.ngrok.io"
+        # Determine base host
         if ngrok_url:
-            callback_url = f"{ngrok_url}/admin/onlyoffice_callback"
-            current_app.logger.info(f"Using ngrok callback URL: {callback_url}")
+            base_url = ngrok_url
+        elif platform.system() == "Windows":
+            base_url = "http://host.docker.internal:5000"
         else:
-            callback_url = f"{onlyoffice_host}/admin/onlyoffice_callback"
-            current_app.logger.info(f"Using Docker callback URL: {callback_url}")
+            base_url = "http://172.17.0.1:5000" # Standard Docker bridge IP
+            
+        # IMPORTANT: We pass the template_id in the callback URL
+        callback_url = f"{base_url}/admin/onlyoffice_callback/{template_id}"
         
-        # Prepare config for ONLYOFFICE
+        current_app.logger.info(f"Editing Template ID: {template_id}")
+        current_app.logger.info(f"Doc URL: {doc_url}")
+        current_app.logger.info(f"Callback URL: {callback_url}")
+
+        # 5. Editor Config
         config = {
             "document": {
-                "title": "CLP Template",
+                "title": doc_title,
                 "url": doc_url,
                 "fileType": "docx",
                 "key": doc_key,
@@ -222,109 +210,76 @@ def manage_template():
                     "name": "Admin User"
                 },
                 "customization": {
-                    "autosave": True,
+                    "autosave": False,
                     "forcesave": True
                 }
             }
         }
-        
-        # Generate JWT token if secret is configured
+
+        # Generate JWT if secret is set
         token = None
         if ONLYOFFICE_JWT_SECRET:
             token = generate_jwt_token(config)
-            current_app.logger.info("JWT token generated for ONLYOFFICE")
-        else:
-            current_app.logger.warning("ONLYOFFICE_JWT_SECRET not set - running without JWT")
-        
-        current_app.logger.info(f"ONLYOFFICE Document Key: {doc_key}")
-        current_app.logger.info(f"Document URL (ONLYOFFICE): {doc_url}")
-        current_app.logger.info(f"Document URL (browser test): {doc_url_for_browser if not use_direct_url else doc_url_direct}")
-        current_app.logger.info(f"Callback URL: {callback_url}")
-        
-        # Render the ONLYOFFICE editor page
+
         return render_template(
             "admin_edit_template.html",
-            doc_title="CLP Template",
+            doc_title=doc_title,
             doc_url=doc_url,
-            doc_url_test=doc_url_direct if use_direct_url else doc_url_for_browser,
+            doc_url_test=doc_url,
             callback_url=callback_url,
             doc_key=doc_key,
             token=token,
-            config=config,
-            use_direct_url=use_direct_url
+            config=config
         )
 
     except Exception as e:
-        current_app.logger.error(f"Error initializing ONLYOFFICE editor: {e}")
-        flash(f"Error initializing editor: {str(e)}", "danger")
-        return redirect(url_for("main.dashboard"))
+        current_app.logger.error(f"Error loading template editor: {e}")
+        flash(f"Error loading editor: {str(e)}", "danger")
+        return redirect(url_for('admin.manage_templates'))
 
 
-@admin_bp.route('/onlyoffice_callback', methods=['POST'])
-def onlyoffice_callback():
-    """Handle ONLYOFFICE save callback — upload updated DOCX to Supabase
-    
-    NOTE: This endpoint must NOT have @login_required because ONLYOFFICE 
-    calls it directly without authentication.
-    """
+@admin_bp.route('/onlyoffice_callback/<int:template_id>', methods=['POST'])
+def onlyoffice_callback(template_id):
+    """Handle ONLYOFFICE save callback for a SPECIFIC template."""
     try:
         data = request.get_json()
-        current_app.logger.info(f"ONLYOFFICE callback received: {data}")
-        
         status = data.get("status")
         
-        # Status codes:
-        # 0 - no document with the key identifier could be found
-        # 1 - document is being edited
-        # 2 - document is ready for saving
-        # 3 - document saving error has occurred
-        # 4 - document is closed with no changes
-        # 6 - document is being edited, but the current document state is saved
-        # 7 - error has occurred while force saving the document
-        
-        if status == 2 or status == 6:  # Document ready for saving or force save
+        # Status 2 (Ready for saving) or 6 (Force save)
+        if status in [2, 6]:
             download_url = data.get("url")
-            
             if not download_url:
-                current_app.logger.error("No download URL in callback")
-                return jsonify({"error": 1})
+                return jsonify({"error": 1, "message": "No url"})
+
+            # 1. Get filename from DB
+            res = supabase.table('templates').select('filename').eq('id', template_id).single().execute()
+            if not res.data:
+                current_app.logger.error(f"Callback failed: Template {template_id} not found in DB.")
+                return jsonify({"error": 1, "message": "Template not found"})
             
-            current_app.logger.info(f"Downloading document from: {download_url}")
-            
-            # Download updated file from ONLYOFFICE
-            response = requests.get(download_url, timeout=30)
-            response.raise_for_status()
-            file_data = response.content
-            
-            current_app.logger.info(f"Downloaded {len(file_data)} bytes")
-            
-            # Upload to Supabase
-            result = supabase.storage.from_(STORAGE_BUCKET_NAME).update(
-                path=TEMPLATE_KEY,
+            storage_path = res.data['filename']
+
+            # 2. Download new file from ONLYOFFICE
+            file_resp = requests.get(download_url, timeout=30)
+            file_resp.raise_for_status()
+            file_data = file_resp.content
+
+            # 3. Upload to Supabase (Overwrite)
+            supabase.storage.from_(STORAGE_BUCKET_NAME).update(
+                path=storage_path,
                 file=file_data,
                 file_options={"content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "upsert": "true"}
             )
             
-            current_app.logger.info(f"✅ Template updated in Supabase: {result}")
+            current_app.logger.info(f"✅ Template {template_id} updated successfully.")
             return jsonify({"error": 0})
-        
-        elif status == 1 or status == 4:
-            # Document is being edited or closed with no changes
-            current_app.logger.info(f"Status {status}: Document being edited or closed with no changes")
-            return jsonify({"error": 0})
-        
-        else:
-            # Error status
-            current_app.logger.error(f"ONLYOFFICE error status: {status}")
-            return jsonify({"error": 1})
-            
+
+        # Status 1 (Editing) or 4 (Closed no changes) -> No error
+        return jsonify({"error": 0})
+
     except Exception as e:
-        current_app.logger.error(f"Error in ONLYOFFICE callback: {e}")
-        import traceback
-        current_app.logger.error(traceback.format_exc())
+        current_app.logger.error(f"Callback error: {e}")
         return jsonify({"error": 1})
-
-
 @admin_bp.route('/download_template')
 @login_required
 @admin_required
@@ -425,6 +380,60 @@ def approve_user_action():
         flash("Form validation failed. Could not approve user.", "danger")
     return redirect(url_for('admin.admin_dashboard'))
 
+@admin_bp.route('/user/<user_id>/edit', methods=['GET', 'POST'])
+@login_required
+@roles_required('admin')
+def edit_user(user_id):
+    # Fetch the user to edit
+    try:
+        user_res = supabase.table('users').select('*').eq('id', user_id).single().execute()
+        user = user_res.data
+        if not user:
+            abort(404)
+    except PostgrestAPIError as e:
+        flash(f"Database error: {e.message}", "danger")
+        return redirect(url_for('admin.admin_dashboard'))
+
+    form = EditUserForm()
+
+    # POST: Update the user
+    if form.validate_on_submit():
+        update_data = {
+            'first_name': form.first_name.data,
+            'last_name': form.last_name.data,
+            'title': form.title.data,
+            'role': form.role.data,
+            'assigned_department': form.department.data if form.department.data else None
+        }
+        try:
+            supabase.table('users').update(update_data).eq('id', user_id).execute()
+            flash(f"User profile for {user['username']} updated successfully.", "success")
+            return redirect(url_for('admin.admin_dashboard'))
+        except Exception as e:
+            flash(f"Error updating user: {str(e)}", "danger")
+
+    # GET: Pre-fill form with existing data
+    if request.method == 'GET':
+        form.first_name.data = user.get('first_name')
+        form.last_name.data = user.get('last_name')
+        form.title.data = user.get('title')
+        form.role.data = user.get('role')
+        form.department.data = user.get('assigned_department')
+
+    return render_template('admin_edit_user.html', form=form, user=user)
+
+@admin_bp.route('/user/<user_id>/suspend', methods=['POST'])
+@login_required
+@roles_required('admin')
+def suspend_user(user_id):
+    """Suspends a user by setting approved=False. They will effectively lose access."""
+    try:
+        # We simply toggle 'approved' to False. They will move to the 'Pending' list.
+        supabase.table('users').update({'approved': False}).eq('id', user_id).execute()
+        flash("User suspended. They have been moved to the Pending Approvals list.", "warning")
+    except Exception as e:
+        flash(f"Error suspending user: {str(e)}", "danger")
+    return redirect(url_for('admin.admin_dashboard'))
 
 @admin_bp.route('/disapprove/<user_id>', methods=['POST'])
 @login_required
@@ -439,3 +448,195 @@ def disapprove_user(user_id):
     except PostgrestAPIError as e:
         flash(f"Database error: {e.message}", 'danger')
     return redirect(url_for('admin.admin_dashboard'))
+
+@admin_bp.route('/departments', methods=['GET', 'POST'])
+@login_required
+@roles_required('admin')
+def manage_departments():
+    form = DepartmentForm()
+    
+    # Handle Adding Department
+    if form.validate_on_submit():
+        dept_name = form.name.data.strip()
+        try:
+            # Check for duplicates (simple check)
+            existing = supabase.table('departments').select('id').eq('name', dept_name).execute()
+            if existing.data:
+                flash(f"Department '{dept_name}' already exists.", "warning")
+            else:
+                supabase.table('departments').insert({'name': dept_name}).execute()
+                flash(f"Department '{dept_name}' added successfully!", "success")
+                return redirect(url_for('admin.manage_departments'))
+        except PostgrestAPIError as e:
+            flash(f"Database error: {e.message}", "danger")
+
+    # Fetch Departments for the list
+    try:
+        dept_res = supabase.table('departments').select('*').order('created_at').execute()
+        departments = dept_res.data
+    except PostgrestAPIError as e:
+        departments = []
+        flash(f"Error fetching departments: {e.message}", "danger")
+
+    return render_template('admin_departments.html', form=form, departments=departments)
+
+@admin_bp.route('/departments/delete/<int:dept_id>', methods=['POST'])
+@login_required
+@roles_required('admin')
+def delete_department(dept_id):
+    try:
+        supabase.table('departments').delete().eq('id', dept_id).execute()
+        flash("Department deleted successfully.", "success")
+    except PostgrestAPIError as e:
+        flash(f"Error deleting department: {e.message}", "danger")
+    return redirect(url_for('admin.manage_departments'))
+@admin_bp.route('/clps')
+@login_required
+@roles_required('admin')
+def manage_clps():
+    # Fetch ALL plans with author details, ordered by newest first
+    try:
+        plans_res = supabase.table('course_learning_plans').select('*, author:users(username, first_name, last_name)').order('date_posted', desc=True).execute()
+        # Format dates
+        plans = parse_supabase_timestamp(plans_res.data, 'date_posted')
+    except PostgrestAPIError as e:
+        flash(f"Database error: {e.message}", "danger")
+        plans = []
+        
+    return render_template('admin_clps.html', plans=plans)
+
+@admin_bp.route('/clp/<int:plan_id>/delete', methods=['POST'])
+@login_required
+@roles_required('admin')
+def delete_clp(plan_id):
+    # 1. Fetch the plan to get the filename
+    try:
+        plan_res = supabase.table('course_learning_plans').select('filename, subject').eq('id', plan_id).single().execute()
+        plan = plan_res.data
+        
+        if not plan:
+            flash("Plan not found.", "danger")
+            return redirect(url_for('admin.manage_clps'))
+
+        # 2. Delete file from Storage (if it exists)
+        if plan.get('filename'):
+            try:
+                supabase.storage.from_(STORAGE_BUCKET_NAME).remove([plan['filename']])
+            except Exception:
+                # Continue deleting the record even if file deletion fails (e.g., file already gone)
+                pass
+        
+        # 3. Delete record from Database
+        supabase.table('course_learning_plans').delete().eq('id', plan_id).execute()
+        flash(f"CLP '{plan['subject']}' has been permanently deleted.", "success")
+        
+    except Exception as e:
+        flash(f"Error deleting plan: {str(e)}", "danger")
+
+    return redirect(url_for('admin.manage_clps'))
+@admin_bp.route('/templates', methods=['GET', 'POST'])
+@login_required
+@roles_required('admin')
+def manage_templates():
+    form = TemplateUploadForm()
+    
+    # 1. Handle Upload
+    if form.validate_on_submit():
+        file = form.file.data
+        filename = secure_filename(file.filename)
+        # Save to a specific 'templates' folder in storage
+        storage_path = f"templates/{int(time.time())}_{filename}"
+        
+        try:
+            # Upload to Supabase Storage
+            file_content = file.read()
+            supabase.storage.from_(STORAGE_BUCKET_NAME).upload(
+                path=storage_path,
+                file=file_content,
+                file_options={"content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+            )
+
+            # Save Metadata to DB
+            dept_id = form.department.data if form.department.data else None
+            is_def = True if form.is_default.data == 'yes' else False
+            
+            # If setting as default, unset others
+            if is_def:
+                supabase.table('templates').update({'is_default': False}).neq('id', 0).execute()
+
+            supabase.table('templates').insert({
+                'name': form.name.data,
+                'filename': storage_path,
+                'department_id': dept_id,
+                'is_default': is_def
+            }).execute()
+            
+            flash("Template uploaded successfully!", "success")
+            return redirect(url_for('admin.manage_templates'))
+            
+        except Exception as e:
+            flash(f"Error uploading template: {str(e)}", "danger")
+
+    # 2. List Templates
+    try:
+        # Fetch templates and join with department names
+        res = supabase.table('templates').select('*, departments(name)').order('created_at', desc=True).execute()
+        templates = res.data
+    except Exception as e:
+        templates = []
+        flash(f"Error loading templates: {str(e)}", "danger")
+
+    return render_template('admin_templates.html', form=form, templates=templates)
+
+@admin_bp.route('/templates/delete/<int:template_id>', methods=['POST'])
+@login_required
+@roles_required('admin')
+def delete_template(template_id):
+    try:
+        # Get filename to delete from storage
+        res = supabase.table('templates').select('filename').eq('id', template_id).single().execute()
+        if res.data:
+            supabase.storage.from_(STORAGE_BUCKET_NAME).remove([res.data['filename']])
+            
+        supabase.table('templates').delete().eq('id', template_id).execute()
+        flash("Template deleted.", "success")
+    except Exception as e:
+        flash(f"Error deleting template: {e}", "danger")
+    return redirect(url_for('admin.manage_templates'))
+@admin_bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+@roles_required('admin')
+def system_settings():
+    form = SystemSettingsForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Upsert each setting
+            updates = [
+                {'key': 'prompt_po_io', 'value': form.prompt_po_io.data},
+                {'key': 'prompt_co_po', 'value': form.prompt_co_po.data},
+                {'key': 'prompt_weekly', 'value': form.prompt_weekly.data}
+            ]
+            
+            for setting in updates:
+                supabase.table('system_settings').update({'value': setting['value']}).eq('key', setting['key']).execute()
+                
+            flash("System settings updated successfully.", "success")
+            return redirect(url_for('admin.system_settings'))
+            
+        except Exception as e:
+            flash(f"Error updating settings: {str(e)}", "danger")
+    
+    # GET request: Populate form from DB
+    if request.method == 'GET':
+        try:
+            res = supabase.table('system_settings').select('*').execute()
+            settings_map = {item['key']: item['value'] for item in res.data}
+            
+            form.prompt_po_io.data = settings_map.get('prompt_po_io', '')
+            form.prompt_co_po.data = settings_map.get('prompt_co_po', '')
+            form.prompt_weekly.data = settings_map.get('prompt_weekly', '')
+        except Exception as e:
+            flash(f"Error fetching settings: {str(e)}", "danger")
+
+    return render_template('admin_settings.html', form=form)
