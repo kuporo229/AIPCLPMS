@@ -4,6 +4,9 @@ run these first for local dev
 ngrok http 5000
 ngrok http 127.0.0.1:5000 for mac
 
+.\venv\Scripts\activate
+
+pip install -r requirements.txt
 Windows: https://streamlike-fanny-nonstrategically.ngrok-free.dev
 Mac: https://unsprayable-rosa-prepueblo.ngrok-free.dev
 
