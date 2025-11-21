@@ -290,7 +290,7 @@ def download_template():
         
         if not template_bytes:
             flash("Template file not found.", "danger")
-            return redirect(url_for('admin.manage_template'))
+            return redirect(url_for('admin.manage_template  '))
         
         return Response(
             template_bytes,
@@ -611,20 +611,21 @@ def system_settings():
     
     if form.validate_on_submit():
         try:
-            # Upsert each setting
+            # Prepare data for bulk upsert
             updates = [
-                {'key': 'prompt_po_io', 'value': form.prompt_po_io.data},
-                {'key': 'prompt_co_po', 'value': form.prompt_co_po.data},
-                {'key': 'prompt_weekly', 'value': form.prompt_weekly.data}
+                {'key': 'prompt_po_io', 'value': form.prompt_po_io.data, 'description': 'Prompt for Program Outcomes vs. Institutional Outcomes mapping.'},
+                {'key': 'prompt_co_po', 'value': form.prompt_co_po.data, 'description': 'Prompt for Course Outcomes vs. Program Outcomes.'},
+                {'key': 'prompt_weekly', 'value': form.prompt_weekly.data, 'description': 'Prompt for the 18-week course outline.'}
             ]
             
-            for setting in updates:
-                supabase.table('system_settings').update({'value': setting['value']}).eq('key', setting['key']).execute()
+            # Use upsert so it creates the row if it doesn't exist
+            supabase.table('system_settings').upsert(updates).execute()
                 
             flash("System settings updated successfully.", "success")
             return redirect(url_for('admin.system_settings'))
             
         except Exception as e:
+            current_app.logger.error(f"Settings Error: {e}")
             flash(f"Error updating settings: {str(e)}", "danger")
     
     # GET request: Populate form from DB

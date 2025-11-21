@@ -255,6 +255,10 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def replace_text_in_paragraph(paragraph, replacements):
+    """
+    Replaces placeholders in a paragraph with values from the replacements dict.
+    Handles converting literal '\n' strings into actual newlines for Word.
+    """
     for key, val in replacements.items():
         if key in paragraph.text:
             inline = paragraph.runs
@@ -262,7 +266,10 @@ def replace_text_in_paragraph(paragraph, replacements):
             if key in full_text:
                 for run in inline:
                     if key in run.text:
-                        run.text = run.text.replace(key, str(val))
+                        # FIX: Convert literal string "\n" (backslash+n) to actual newline character
+                        # This ensures lists and multi-line text render correctly in the DOCX
+                        replacement_text = str(val).replace('\\n', '\n')
+                        run.text = run.text.replace(key, replacement_text)  
 
 def replace_text_in_cell(cell, replacements):
     for paragraph in cell.paragraphs:
@@ -310,21 +317,23 @@ def get_current_user_profile():
         return None
 
 # --- AI GENERATION BACKGROUND TASK (REFACTORED AND IMPROVED) ---
-def start_clp_generation(user_id, course_data):
+# Update this function to accept plan_id
+def start_clp_generation(plan_id, user_id, course_data):
     """A public function to start the background thread."""
-    thread = Thread(target=generate_clp_background_task, args=(current_app.app_context(), user_id, course_data))
+    # Pass plan_id to the background task
+    thread = Thread(target=generate_clp_background_task, args=(current_app.app_context(), plan_id, user_id, course_data))
     thread.daemon = True
     thread.start()
 
-def generate_clp_background_task(app_context, user_id, course_data):
+def generate_clp_background_task(app_context, plan_id, user_id, course_data):
     subject_name = course_data['subject']
     department = course_data['department']
   
     with app_context:
         try:
-            current_app.logger.info(f"--- [AI DEBUG] BG Task started for user {user_id}, subject '{subject_name}'. ---")
+            current_app.logger.info(f"--- [AI DEBUG] BG Task started for CLP {plan_id}, user {user_id}. ---")
             
-            model_instance = GenerativeModel('gemini-2.5-pro')
+            model_instance = GenerativeModel('gemini-2.5-flash')
             clp_data = {}
             
             # --- Step 1: Generate Basic Info and References (Text Generation) ---
@@ -332,38 +341,22 @@ def generate_clp_background_task(app_context, user_id, course_data):
             # --- Step 2: Generate Program to Institutional Outcomes Mapping ---
             current_app.logger.info("--- [AI DEBUG] Step 2: Generating Program to Institutional Outcomes Mapping... ---")
             po_io_prompt_raw = get_system_prompt('prompt_po_io', default_text="You are an expert academic planner...") 
-        # No variables to format in this one typically, but good practice to allow it
-            po_io_prompt = po_io_prompt_raw
             po_io_schema_properties = {f"{po_code}_{io_header}": {"type": "STRING", "enum": ["✔", " "]} for po_code in PROGRAM_OUTCOMES_HEADERS for io_header in INSTITUTIONAL_OUTCOMES_HEADERS}
-            step2_generation_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": po_io_schema_properties, "required": list(po_io_schema_properties.keys())}}
-            try:
-                response_po_io = model_instance.generate_content(contents=[po_io_prompt], generation_config=step2_generation_config)
-                clp_data.update(json.loads(response_po_io.text))
-                current_app.logger.info("--- [AI DEBUG] Step 2: PO to IO mapping generated successfully. ---")
-            except genai.types.generation_types.BlockedPromptException as e:
-                raise ValueError(f"AI generation failed (Blocked): {e.message}")
-            except Exception as e:
-                raise RuntimeError(f"AI generation failed (Step 2): {e}")
+            step2_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": po_io_schema_properties, "required": list(po_io_schema_properties.keys())}}
+            resp_2 = model_instance.generate_content(contents=[po_io_prompt_raw], generation_config=step2_config)
+            clp_data.update(json.loads(resp_2.text))
 
-            # --- Step 3: Generate Course to Program Outcomes Mapping ---
-            current_app.logger.info("--- [AI DEBUG] Step 3: Generating Course to Program Outcomes Mapping... ---")
+            # [STEP 3: CO-PO]
             course_outcomes_string = ", ".join([f"{co['code']}: {co['description']}" for co in COURSE_OUTCOMES])
             program_outcomes_string = ", ".join([f"{po['code']}: {po['description']}" for po in PROGRAM_OUTCOMES])
             co_po_prompt_raw = get_system_prompt('prompt_co_po', default_text="Given the Course Outcomes...")
             co_po_prompt = co_po_prompt_raw.replace('{course_outcomes}', course_outcomes_string).replace('{program_outcomes}', program_outcomes_string)
             co_po_schema_properties = {f"{co_code_obj['code']}_{po_code}": {"type": "STRING", "enum": ["E", "I", " "]} for co_code_obj in COURSE_OUTCOMES for po_code in PROGRAM_OUTCOMES_HEADERS}
-            step3_generation_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": co_po_schema_properties, "required": list(co_po_schema_properties.keys())}}
-            try:
-                response_co_po = model_instance.generate_content(contents=[co_po_prompt], generation_config=step3_generation_config)
-                clp_data.update(json.loads(response_co_po.text))
-                current_app.logger.info("--- [AI DEBUG] Step 3: CO to PO mapping generated successfully. ---")
-            except genai.types.generation_types.BlockedPromptException as e:
-                raise ValueError(f"AI generation failed (Blocked): {e.message}")
-            except Exception as e:
-                raise RuntimeError(f"AI generation failed (Step 3): {e}")
+            step3_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": co_po_schema_properties, "required": list(co_po_schema_properties.keys())}}
+            resp_3 = model_instance.generate_content(contents=[co_po_prompt], generation_config=step3_config)
+            clp_data.update(json.loads(resp_3.text))
 
-            # --- Step 4: Generate Weekly Breakdown ---
-            current_app.logger.info("--- [AI DEBUG] Step 4: Generating Weekly Breakdown... ---")
+            # [STEP 4: Weekly]
             weekly_prompt_raw = get_system_prompt('prompt_weekly', default_text="Generate the complete 18-week Course Outline...")
             weekly_breakdown_prompt = weekly_prompt_raw.replace('{subject_name}', subject_name)
             weekly_schema_properties = {}
@@ -372,131 +365,111 @@ def generate_clp_background_task(app_context, user_id, course_data):
                 for suffix in ["_LO", "_TO", "_Method", "_Assesment", "_LR"]:
                     weekly_schema_properties[f"{week_prefix}{suffix}"] = {"type": "STRING"}
             weekly_schema_properties['references'] = {"type": "STRING"}
-            step4_generation_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": weekly_schema_properties, "required": list(weekly_schema_properties.keys())}}
-            
-            try:
-                response_weekly = model_instance.generate_content(contents=[weekly_breakdown_prompt], generation_config=step4_generation_config)
-                clp_data.update(json.loads(response_weekly.text))
-                current_app.logger.info("--- [AI DEBUG] Step 4: Weekly Breakdown generated successfully. ---")
-            except genai.types.generation_types.BlockedPromptException as e:
-                raise ValueError(f"AI generation failed (Blocked): {e.message}")
-            except Exception as e:
-                raise RuntimeError(f"AI generation failed (Step 4): {e}")
-            current_app.logger.info("--- [AI DEBUG] Injecting user-provided course data. ---")
+            step4_config = {"response_mime_type": "application/json", "response_schema": {"type": "OBJECT", "properties": weekly_schema_properties, "required": list(weekly_schema_properties.keys())}}
+            resp_4 = model_instance.generate_content(contents=[weekly_breakdown_prompt], generation_config=step4_config)
+            clp_data.update(json.loads(resp_4.text))
+
+            # Inject User Data
             clp_data.update(course_data)
             
-
-            # --- SUPABASE INTEGRATION START ---
+            # --- SUPABASE PROCESSING ---
             
-            # 1. [SUPABASE] Fetch the user's profile from the 'users' table.
-            current_app.logger.info("--- [AI DEBUG] BG Task: Fetching user profile from Supabase... ---")
+            # 1. Fetch user profile for template filling
             user_res = supabase.table('users').select('first_name, last_name, title').eq('id', user_id).single().execute()
-            if not user_res.data:
-                raise RuntimeError(f"User profile not found for user_id: {user_id}")
             current_user = user_res.data
+            clp_data['NAME'] = f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip()
+            clp_data['TITLE'] = current_user.get('title', '')
             
-            # 2. Prepare placeholders for the document template.
-            author_full_name = f"{current_user.get('first_name', '')} {current_user.get('last_name', '')}".strip()
-            author_title = current_user.get('title', '')
-            clp_data['NAME'] = author_full_name
-            clp_data['TITLE'] = author_title
-            
-            # 3. [SUPABASE] Insert the initial record into the database.
-            final_subject = clp_data.get('descriptive_title', subject_name)
-            current_app.logger.info(f"--- [AI DEBUG] BG Task: Inserting initial CLP record for '{final_subject}'... ---")
-            inserted_plan_res = supabase.table('course_learning_plans').insert({
-                'department': department,
-                'subject': final_subject,
-                'content': json.dumps(clp_data, indent=2),
-                'upload_type': 'ai_generated',
-                'status': 'draft',
-                'user_id': user_id
-            }).execute()
-            new_clp = inserted_plan_res.data[0]
-            new_clp_id = new_clp['id']
-            
-            # --- DYNAMIC TEMPLATE SELECTION ---
-            current_app.logger.info(f"--- [AI DEBUG] Selecting template for department: {department} ---")
-            
+            # 2. Select Template (Dynamic Logic)
             template_key = None
-            
             try:
-                # 1. Try to find a template specifically assigned to this department name
-                # We need the department ID first, or we search by joined name if Supabase allows, 
-                # but simpler to search 'templates' where department_id matches the department name look up.
-                
-                # First, look up the department ID from the 'departments' table using the name passed in course_data
                 dept_res = supabase.table('departments').select('id').eq('name', department).execute()
-                
                 if dept_res.data:
                     dept_id = dept_res.data[0]['id']
-                    # Now find a template with this dept_id
                     tmpl_res = supabase.table('templates').select('filename').eq('department_id', dept_id).limit(1).execute()
                     if tmpl_res.data:
                         template_key = tmpl_res.data[0]['filename']
-                        current_app.logger.info(f"--- [AI DEBUG] Found department-specific template: {template_key} ---")
-
-                # 2. If no department specific template, find the Global Default
+                
                 if not template_key:
                     def_res = supabase.table('templates').select('filename').eq('is_default', True).limit(1).execute()
                     if def_res.data:
                         template_key = def_res.data[0]['filename']
-                        current_app.logger.info(f"--- [AI DEBUG] Using global default template: {template_key} ---")
-
-                # 3. Fallback to the old hardcoded one if DB is empty (Safety net)
-                if not template_key:
-                    template_key = "PBSIT/PBSIT-001-LP-20242.docx" 
-                    current_app.logger.info("--- [AI DEBUG] No DB template found. Using legacy hardcoded fallback. ---")
-
-                # --- DOWNLOAD THE SELECTED TEMPLATE ---
-                current_app.logger.info(f"--- [AI DEBUG] Downloading template file: {template_key} ---")
-                template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(template_key)
                 
-                if not template_bytes:
-                    raise FileNotFoundError(f"Template file '{template_key}' listed in DB but not found in Storage.")
-                    
+                if not template_key:
+                    template_key = "PBSIT/PBSIT-001-LP-20242.docx" # Fallback
+
+                template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(template_key)
             except Exception as e:
-                 # Fallback to hardcoded if DB query fails entirely
-                 current_app.logger.error(f"Template selection failed: {e}")
-                 # Attempt one last fallback
-                 template_key = "PBSIT/PBSIT-001-LP-20242.docx"
-                 template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(template_key)
+                # Fallback
+                template_key = "PBSIT/PBSIT-001-LP-20242.docx"
+                template_bytes = supabase.storage.from_(STORAGE_BUCKET_NAME).download(template_key)
 
-            # Create Document object from bytes
-            
-            
+            # 3. Generate DOCX
             doc = Document(io.BytesIO(template_bytes))
-
-# Replace placeholders
             flat_replacements = flatten_json(clp_data)
             doc = replace_placeholders(doc, flat_replacements)
-
-# Save generated file into memory
             file_stream = io.BytesIO()
             doc.save(file_stream)
             file_stream.seek(0)
             
-            # 5. [SUPABASE] Upload the generated .docx file to Supabase Storage.
-            docx_filename = f"{new_clp['subject'].replace(' ', '_')}_Generated_{new_clp_id}.docx"
+            # 4. Upload File
+            # Use plan_id in filename to ensure uniqueness
+            docx_filename = f"{subject_name.replace(' ', '_')}_Generated_{plan_id}.docx"
             file_path_in_bucket = f"{user_id}/{docx_filename}"
             
-            current_app.logger.info(f"--- [AI DEBUG] BG Task: Uploading '{docx_filename}' to Supabase Storage... ---")
             supabase.storage.from_(STORAGE_BUCKET_NAME).upload(
                 path=file_path_in_bucket,
                 file=file_stream.read(),
                 file_options={"content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
             )
             
-            # 6. [SUPABASE] Update the database record with the filename and change its status.
-            current_app.logger.info(f"--- [AI DEBUG] BG Task: Finalizing database record for CLP ID: {new_clp_id}... ---")
-            supabase.table('course_learning_plans').update({
-                'filename': file_path_in_bucket,
-                'upload_type': 'file_upload',
-                'content': None # Clear the JSON content to save space
-            }).eq('id', new_clp_id).execute()
+            # 5. UPDATE the existing database record (don't insert new)
+            current_app.logger.info(f"--- [AI DEBUG] BG Task: Finalizing CLP {plan_id}... ---")
             
-            # 7. Notify the user of success.
-            create_notification(user_id, f'Your AI-generated CLP for "{final_subject}" is ready and saved as a downloadable file.')
+            final_subject = clp_data.get('descriptive_title', subject_name)
+            
+            supabase.table('course_learning_plans').update({
+                'subject': final_subject, # Update subject if AI refined it
+                'filename': file_path_in_bucket,
+                'upload_type': 'file_upload', # Switch to file type so it opens in ONLYOFFICE
+                'content': json.dumps(clp_data), # Keep JSON for backup/viewing
+                'status': 'draft' # Mark as done (Draft allows editing)
+            }).eq('id', plan_id).execute()
+            
+            # 6. Notify
+            create_notification(user_id, f'Your AI-generated CLP for "{final_subject}" is ready!')
+            
+        except Exception as e:
+            current_app.logger.error(f"--- [AI DEBUG] BG Task FAILED: {e} ---")
+            import traceback
+            current_app.logger.error(traceback.format_exc())
+            
+            # Mark as failed in DB so UI stops loading
+            try:
+                supabase.table('course_learning_plans').update({
+                    'status': 'failed', # You might need to ensure UI handles 'failed' or just 'draft' with error note
+                    'content': f"Generation failed: {str(e)}"
+                }).eq('id', plan_id).execute()
+            except:
+                pass
+                
+            create_notification(user_id, f'CLP generation failed: {e}')
+            
+        except Exception as e:
+            current_app.logger.error(f"--- [AI DEBUG] BG Task FAILED: {e} ---")
+            import traceback
+            current_app.logger.error(traceback.format_exc())
+            
+            # Mark as failed in DB so UI stops loading
+            try:
+                supabase.table('course_learning_plans').update({
+                    'status': 'failed', # You might need to ensure UI handles 'failed' or just 'draft' with error note
+                    'content': f"Generation failed: {str(e)}"
+                }).eq('id', plan_id).execute()
+            except:
+                pass
+                
+            create_notification(user_id, f'CLP generation failed: {e}')
             current_app.logger.info("--- [AI DEBUG] BG Task: Process completed successfully. ---")
             
         except FileNotFoundError as e:

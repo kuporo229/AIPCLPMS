@@ -111,4 +111,10 @@
         </div>
     </form>
 </div>
+<script>
+    // When the form is submitted, set the flag to enable the global loader
+    document.querySelector('form').addEventListener('submit', function() {
+        localStorage.setItem('is_generating', 'true');
+    });
+</script>
 {% endblock %}

@@ -24,6 +24,9 @@
                 <div class="mt-1">
                     {{ form.prompt_po_io(class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md font-mono text-sm") }}
                 </div>
+                {% for error in form.prompt_po_io.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ error }}</p>
+                {% endfor %}
                 <p class="mt-2 text-sm text-gray-500">Controls how the Program Outcomes align with Institutional Outcomes.</p>
             </div>
 
@@ -37,6 +40,9 @@
                 <div class="mt-1">
                     {{ form.prompt_co_po(class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md font-mono text-sm") }}
                 </div>
+                {% for error in form.prompt_co_po.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ error }}</p>
+                {% endfor %}
                 <p class="mt-2 text-sm text-gray-500">
                     <strong>Important:</strong> Must keep placeholders <code>{course_outcomes}</code> and <code>{program_outcomes}</code>.
                 </p>
@@ -52,6 +58,9 @@
                 <div class="mt-1">
                     {{ form.prompt_weekly(class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md font-mono text-sm") }}
                 </div>
+                {% for error in form.prompt_weekly.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ error }}</p>
+                {% endfor %}
                 <p class="mt-2 text-sm text-gray-500">
                     <strong>Important:</strong> Must keep placeholder <code>{subject_name}</code>.
                 </p>

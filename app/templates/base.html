@@ -175,7 +175,77 @@
         </div>
     </main>
 
+    
     {% block scripts %}
     {% endblock %}
+   
+
+    <div id="ai-generation-status" class="fixed bottom-5 right-5 bg-white border border-gray-200 rounded-lg shadow-xl p-4 flex items-center space-x-4 hidden z-50 transition-all transform translate-y-0">
+    <div class="relative">
+        <div class="w-15 h-15 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+    </div>
+    <div>
+        <h4 class="text-sm font-bold text-gray-800">Generating CLP...</h4>
+        <p id="ai-status-text" class="text-xs text-gray-500">AI is writing your course plan.</p>
+    </div>
+</div>
+
+
 </body>
+ <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusEl = document.getElementById('ai-generation-status');
+        const statusText = document.getElementById('ai-status-text');
+        let pollInterval;
+
+        function stopPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            statusEl.classList.add('hidden');
+            localStorage.removeItem('is_generating'); // Clear flag so it doesn't run again
+        }
+
+        function checkStatus() {
+            // 1. Safety Check: If flag is missing, don't poll.
+            if (localStorage.getItem('is_generating') !== 'true') {
+                return; 
+            }
+
+            fetch("{{ url_for('teacher.check_generation_status') }}")
+                .then(response => {
+                    if (response.ok) return response.json();
+                    throw new Error('Network error');
+                })
+                .then(data => {
+                    if (data.generating) {
+                        // STIL GENERATING: Ensure UI is visible
+                        statusEl.classList.remove('hidden');
+                        
+                        // Update text
+                        const count = data.plans.length;
+                        if (count > 0) {
+                            statusText.textContent = `Generating "${data.plans[0].subject}"...`;
+                        }
+                    } else {
+                        // FINISHED: Stop polling and clean up
+                        console.log("Generation complete.");
+                        stopPolling();
+                        
+                        // If user is on the "My Courses" page, reload to show the new plan
+                        if (window.location.pathname.includes('/my_clps')) {
+                            window.location.reload();
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.log("Status check skipped:", err);
+                });
+        }
+
+        // 2. Initialization: Only start the interval if the flag exists
+        if (localStorage.getItem('is_generating') === 'true') {
+            checkStatus(); // Check immediately
+            pollInterval = setInterval(checkStatus, 5000); // Poll every 5 seconds (gentle)
+        }
+    });
+</script>
 </html>
