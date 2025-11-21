@@ -1,6 +1,6 @@
 # app/blueprints/auth.py
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app # <--- Changed 'app' to 'current_app'
 from app import supabase
 from app.forms import LoginForm, SignupForm
 from app.decorators import login_required
@@ -44,13 +44,13 @@ def login():
 def signup():
     form = SignupForm()
     if form.validate_on_submit():
-        # Check if username or email already exists in our public users table
-        existing_user_res = supabase.table('users').select('id').or_(f"username.eq.{form.username.data},email.eq.{form.email.data}").execute()
-        if existing_user_res.data:
-            flash('Username or email already exists. Please choose a different one or login.', 'danger')
-            return redirect(url_for('auth.signup'))
-            
         try:
+            # Check if username or email already exists in our public users table
+            existing_user_res = supabase.table('users').select('id').or_(f"username.eq.{form.username.data},email.eq.{form.email.data}").execute()
+            if existing_user_res.data:
+                flash('Username or email already exists. Please choose a different one or login.', 'danger')
+                return redirect(url_for('auth.signup'))
+            
             # Step 1: Create the user in Supabase Auth
             auth_user = supabase.auth.sign_up({
                 'email': form.email.data,
@@ -76,8 +76,9 @@ def signup():
             else:
                  flash('Could not create authentication user. Please try again.', 'danger')
         except Exception as e:
-            app.logger.error(f"Signup failed: {e}")
-            flash('An error occurred during registration. Please check the server logs.', 'danger')
+            # --- FIX: Use current_app instead of app ---
+            current_app.logger.error(f"Signup failed: {e}")
+            flash(f'An error occurred during registration: {str(e)}', 'danger')
     return render_template('signup.html', form=form)
 
 @auth_bp.route('/logout')
@@ -86,8 +87,7 @@ def logout():
     try:
         supabase.auth.sign_out()
     except Exception as e:
-        # app.logger is not available directly, use current_app
-        pass # Log in the main app
+        current_app.logger.error(f"Logout error: {e}")
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))

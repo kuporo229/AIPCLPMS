@@ -2,81 +2,79 @@
 
 {% block title %}Register Account - Course Management{% endblock %}
 
-
-
 {% block content %}
 <div class="w-full max-w-md mx-auto py-10">
-    <form method="post" action="{{ url_for('auth.signup') }}" class="bg-white shadow-md rounded-xl px-8 pt-6 pb-8 mb-4" novalidate>
+    <form method="post" action="{{ url_for('auth.signup') }}" class="bg-white dark:bg-gray-800 shadow-md rounded-xl px-8 pt-6 pb-8 mb-4 transition-colors duration-200" novalidate>
         
         {{ form.hidden_tag() }} 
 
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Create Your Account</h2>
+        <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-white mb-8">Create Your Account</h2>
         
         <div class="mb-4">
-            {{ form.first_name.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.first_name(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="Your First Name") }}
+            {{ form.first_name.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.first_name(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="Your First Name") }}
             {% for error in form.first_name.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
         <div class="mb-4">
-            {{ form.last_name.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.last_name(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="Your Last Name") }}
+            {{ form.last_name.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.last_name(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="Your Last Name") }}
             {% for error in form.last_name.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
 
         <div class="mb-4">
-            {{ form.username.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.username(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="Choose a Username") }}
+            {{ form.username.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.username(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="Choose a Username") }}
             {% for error in form.username.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
         <div class="mb-4">
-            {{ form.email.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.email(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="Your Email Address") }}
+            {{ form.email.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.email(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="Your Email Address") }}
             {% for error in form.email.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
         {# NEW: Title Field #}
         <div class="mb-4">
-            {{ form.title.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.title(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="e.g., DIT, Ph.D., RMT") }}
+            {{ form.title.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.title(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="e.g., DIT, Ph.D., RMT") }}
             {% for error in form.title.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
 
         <div class="mb-4">
-            {{ form.password.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.password(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="Must be at least 8 characters") }}
+            {{ form.password.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.password(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="Must be at least 8 characters") }}
             {% for error in form.password.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
         <div class="mb-4">
-            {{ form.confirm_password.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.confirm_password(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500", placeholder="Repeat your password") }}
+            {{ form.confirm_password.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.confirm_password(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", placeholder="Repeat your password") }}
             {% for error in form.confirm_password.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
         <div class="mb-6">
-            {{ form.department.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.department(class="block appearance-none w-full bg-white border border-gray-200 text-gray-700 py-3 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500") }}
+            {{ form.department.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+            {{ form.department(class="block appearance-none w-full border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-white py-3 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white dark:focus:bg-gray-700 bg-white dark:bg-gray-700 focus:border-gray-500") }}
             {% for error in form.department.errors %}
                 <p class="text-red-500 text-xs italic mt-1">{{ error }}</p>
             {% endfor %}
         </div>
 
         <div class="flex items-center justify-between">
-            {{ form.submit(class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline w-full cursor-pointer") }}
+            {{ form.submit(class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg focus:outline-none focus:shadow-outline w-full cursor-pointer dark:bg-indigo-600 dark:hover:bg-indigo-500") }}
         </div>
-        <p class="text-center text-gray-500 text-sm mt-6">
-            Already have an account? <a class="font-bold text-indigo-600 hover:text-indigo-800" href="{{ url_for('auth.login') }}">Log In</a>
+        <p class="text-center text-gray-500 dark:text-gray-400 text-sm mt-6">
+            Already have an account? <a class="font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300" href="{{ url_for('auth.login') }}">Log In</a>
         </p>
     </form>
 </div>

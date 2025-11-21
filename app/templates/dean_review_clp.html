@@ -2,38 +2,45 @@
 
 {% block title %}Dean Review: {{ plan.subject }}{% endblock %}
 
-
-
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="bg-white p-8 rounded-xl shadow-md space-y-10">
-        <div class="border-b pb-4">
-            <h1 class="text-3xl font-bold text-gray-900">{{ content_data.descriptive_title or plan.subject }}</h1>
-            <p class="mt-1 text-lg text-gray-600">{{ plan.department }}</p>
-            <p class="mt-1 text-sm text-gray-500">Submitted by {{ plan.author.username }} on {{ plan.date_posted.strftime('%B %d, %Y') }}</p>
-            <p class="mt-1 text-sm text-gray-500">Current Status: <span class="font-semibold text-orange-500">{{ plan.status.replace('_', ' ').title() }}</span></p>
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md space-y-10 transition-colors duration-200">
+        <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ content_data.descriptive_title or plan.subject }}</h1>
+            <p class="mt-1 text-lg text-gray-600 dark:text-gray-400">{{ plan.department }}</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-500">Submitted by {{ plan.author.username }} on {{ plan.date_posted.strftime('%B %d, %Y') }}</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-500">Current Status: <span class="font-semibold text-orange-500">{{ plan.status.replace('_', ' ').title() }}</span></p>
 
-            {# Download button logic #}
+            {# Download button #}
             {% if plan.upload_type == 'file_upload' or plan.upload_type == 'ai_generated' %}
-                <a href="{{ url_for('teacher.download_clp', plan_id=plan.id) }}" class="inline-flex items-center mt-4 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M.001 6.88a2 2 0 011.603-1.995L4.417 4H15.58A2 2 0 0117.22 5.09l.33 1.995a2 2 0 01-1.603 1.995L15.583 10H4.417L.001 6.88zM4.417 12h11.166a2 2 0 001.603-1.995L17.22 8H2.78l-.33 1.995A2 2 0 004.417 12zM15 14H5a1 1 0 00-1 1v1a1 1 0 001 1h10a1 1 0 001-1v-1a1 1 0 00-1-1z" clip-rule="evenodd" />
-                    </svg>
-                    Download Document
-                </a>
+                <div class="mt-4 flex flex-wrap gap-3">
+                    <a href="{{ url_for('teacher.download_clp', plan_id=plan.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none">
+                        <svg class="-ml-1 mr-2 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Download File
+                    </a>
+
+                    <a href="{{ url_for('dean.review_clp_document', plan_id=plan.id) }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-7.536 7.536l-2.828 2.828a1 1 0 00-.293.707v3h3a1 1 0 00.707-.293l2.828-2.828-3.121-3.121z" />
+                        </svg>
+                        Review in Editor
+                    </a>
+                </div>
             {% endif %}
         </div>
 
-        {# Display Content if it's manual text or AI generated JSON #}
+        {# Content Display #}
         {% if plan.upload_type == 'manual_text' %}
             <section>
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Learning Plan Content</h2>
-                <div class="prose max-w-none text-gray-700 whitespace-pre-wrap">{{ plan.content }}</div>
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Learning Plan Content</h2>
+                <div class="prose max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ plan.content }}</div>
             </section>
         {% elif plan.upload_type == 'ai_generated' %}
             <section>
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Course Information</h2>
-                <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Course Information</h2>
+                <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm text-gray-800 dark:text-gray-300">
                     <div><strong>Course Number:</strong> {{ content_data.course_number }}</div>
                     <div><strong>Units:</strong> {{ content_data.units }}</div>
                     <div><strong>Contact Hours:</strong> {{ content_data.Contact_hours_per_week }}</div>
@@ -49,9 +56,9 @@
             </section>
 
             <section>
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Program Outcomes and their Relationship to the Institutional Outcomes</h2>
-                <table class="min-w-full border-collapse border border-gray-300 text-sm">
-                    <thead class="bg-gray-50">
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Program Outcomes vs. Institutional Outcomes</h2>
+                <table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
                             <th class="table-cell header-cell">CODE</th>
                             <th class="table-cell header-cell">BSIT PROGRAM OUTCOMES</th>
@@ -69,7 +76,7 @@
                             <th class="table-cell center-cell">H</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="text-gray-800 dark:text-gray-300">
                         {% for po in program_outcomes %}
                         <tr>
                             <td class="table-cell font-medium">{{ po.code }}</td>
@@ -88,9 +95,9 @@
             </section>
 
             <section>
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Course Outcomes and their Relationship to the Program Outcomes</h2>
-                <table class="min-w-full border-collapse border border-gray-300 text-sm">
-                    <thead class="bg-gray-50">
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Course Outcomes vs. Program Outcomes</h2>
+                <table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
                             <th class="table-cell header-cell" rowspan="2">COURSE OUTCOMES</th>
                             <th class="table-cell header-cell" colspan="13">PROGRAM OUTCOMES</th>
@@ -101,7 +108,7 @@
                             {% endfor %}
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="text-gray-800 dark:text-gray-300">
                         {% for co in course_outcomes %}
                             <tr>
                                 <td class="table-cell font-medium">{{ co.description }}</td>
@@ -115,9 +122,9 @@
             </section>
 
             <section>
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Course Outline</h2>
-                <table class="min-w-full border-collapse border border-gray-300 text-sm">
-                    <thead class="bg-gray-50">
+                <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Course Outline</h2>
+                <table class="min-w-full border-collapse border border-gray-300 dark:border-gray-600 text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
                             <th class="table-cell header-cell">Week</th>
                             <th class="table-cell header-cell">Learning Outcomes (LO)</th>
@@ -127,15 +134,15 @@
                             <th class="table-cell header-cell">Learning Resources (LR)</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="text-gray-800 dark:text-gray-300">
                         {% for i in range(1, 19) %}
-                        <tr class="bg-white">
+                        <tr class="bg-white dark:bg-gray-800">
                             <td class="table-cell font-medium">{{ i }}</td>
-                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_LO', '') }}</td>
-                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_TO', '') }}</td>
-                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_Method', '') }}</td>
-                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_Assesment', '') }}</td>
-                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_LR', '') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_LO', '').replace('\\n', '\n') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_TO', '').replace('\\n', '\n') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_Method', '').replace('\\n', '\n') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_Assesment', '').replace('\\n', '\n') }}</td>
+                            <td class="table-cell whitespace-pre-wrap">{{ content_data.get('W' ~ i ~ '_LR', '').replace('\\n', '\n') }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -143,22 +150,22 @@
             </section>
         {% endif %}
 
-        <div class="mt-8 pt-4 border-t">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Dean's Review Actions</h2>
+        <div class="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Dean's Review Actions</h2>
             {% if plan.dean_comments %}
-                <div class="p-4 mb-4 text-sm text-red-800 bg-red-100 rounded-lg" role="alert">
+                <div class="p-4 mb-4 text-sm text-red-800 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg" role="alert">
                     <span class="font-bold">Dean's Comments:</span> {{ plan.dean_comments }}
                 </div>
             {% endif %}
             <form method="post" action="{{ url_for('dean.dean_review_clp', plan_id=plan.id) }}">
                 {{ form.hidden_tag() }}
                 <div class="mb-4">
-                    {{ form.comments.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-                    {{ form.comments(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500", rows="4") }}
+                    {{ form.comments.label(class="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2") }}
+                    {{ form.comments(class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white", rows="4") }}
                 </div>
                 <div class="flex space-x-4">
-                    {{ form.submit_approve(class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline cursor-pointer") }}
-                    {{ form.submit_return(class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline cursor-pointer") }}
+                    {{ form.submit_approve(class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline cursor-pointer transition-colors") }}
+                    {{ form.submit_return(class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline cursor-pointer transition-colors") }}
                 </div>
             </form>
         </div>

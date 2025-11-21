@@ -3,14 +3,12 @@
 {% block title %}Organize. Learn. Succeed.{% endblock %}
 
 {% block custom_nav %}
-<nav class="bg-white shadow-sm sticky top-0 z-10 landing-nav">
+<nav class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 landing-nav border-b border-gray-100 dark:border-gray-700">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
-            <h1 class="text-xl font-bold text-gray-700">AI-CLPMS</h1>
+            <h1 class="text-xl font-bold text-gray-700 dark:text-gray-200">AI-CLPMS</h1>
             <div class="flex items-center space-x-2">
-                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
+                <a href="{{ url_for('auth.login') }}" class="text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium">Log In</a>
             </div>
         </div>
     </div>
@@ -18,16 +16,16 @@
 {% endblock %}
 
 {% block content %}
-<div class="relative bg-white">
+<div class="relative bg-white dark:bg-gray-900 transition-colors duration-200">
     
     <div class="hero-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
             
             <div class="lg:col-span-1 pt-12">
-                <h1 class="text-5xl font-extrabold text-gray-900 sm:text-6xl mb-6">
+                <h1 class="text-5xl font-extrabold text-gray-900 dark:text-white sm:text-6xl mb-6">
                     Organize. Learn. Succeed.
                 </h1>
-                <p class="mt-4 text-xl text-gray-600 max-w-lg">
+                <p class="mt-4 text-xl text-gray-600 dark:text-gray-300 max-w-lg">
                     Take control of your learning journey with a smarter way to manage courses, track progress, and achieve your goals.
                 </p>
 
@@ -35,36 +33,40 @@
                     <a href="{{ url_for('auth.signup') }}" class="w-auto px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
                         REGISTER
                     </a>
-                    <a href="{{ url_for('auth.login') }}" class="w-auto px-6 py-3 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 transition duration-150 ease-in-out">
+                    <a href="{{ url_for('auth.login') }}" class="w-auto px-6 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 ease-in-out">
                         LOG IN
                     </a>
                 </div>
             </div>
             
             <div class="lg:col-span-1 flex justify-center lg:justify-end">
-                Picture
+               <div class="w-full h-64 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 dark:text-gray-600">
+                   [Hero Image Placeholder]
+               </div>
             </div>
         </div>
     </div>
     
-    <div class="learn-more-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
+    <div class="learn-more-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 border-t border-gray-100 dark:border-gray-800 pt-16">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
             
             <div class="lg:col-span-1 flex justify-center lg:order-2">
-                Picture
+                 <div class="w-full h-64 bg-gray-200 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 dark:text-gray-600">
+                    [Feature Image Placeholder]
+                </div>
             </div>
             
             <div class="lg:col-span-1 lg:order-1 pt-4">
-                <p class="text-xs font-semibold uppercase text-gray-500 tracking-wider">
+                <p class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider">
                     LEARN MORE
                 </p>
-                <h2 class="text-3xl font-bold text-gray-900 mt-2 mb-4">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-white mt-2 mb-4">
                     Overview
                 </h2>
-                <p class="text-gray-600 leading-relaxed">
+                <p class="text-gray-600 dark:text-gray-300 leading-relaxed">
                     The Course Learning Plan Management System helps instructors, students, and administrators streamline their teaching and learning journey. From creating structured course plans to tracking learning progress, everything is just a click away.
                 </p>
-                <p class="text-gray-600 leading-relaxed mt-4">
+                <p class="text-gray-600 dark:text-gray-300 leading-relaxed mt-4">
                     With CLPMS, everything you need to plan, teach, and learn is brought together in one seamless platform. No more scattered documents, missed deadlines, or unclear objectives. It will be just a smarter, more connected way to move education forward.
                 </p>
             </div>

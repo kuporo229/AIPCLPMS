@@ -2,51 +2,26 @@
 
 {% block title %}Dean Dashboard{% endblock %}
 
-
 {% block content %}
 <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <h1 class="text-3xl font-bold leading-tight text-gray-900">
+    <h1 class="text-3xl font-bold leading-tight text-gray-900 dark:text-white">
         Dean's Overview
     </h1>
 </header>
 <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-8">
-    <div class="bg-white shadow-lg rounded-xl p-6">
-        <h3 class="text-xl font-semibold text-gray-800">Administrative Actions</h3>
-        <p class="text-gray-600 mt-2">Oversee faculty, courses, and manage reports.</p>
+    <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-6 transition-colors duration-200">
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-white">Administrative Actions</h3>
+        <p class="text-gray-600 dark:text-gray-400 mt-2">Oversee faculty, courses, and manage reports.</p>
         <div class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <a href="{{ url_for('dean.dean_faculty') }}" class="block p-4 rounded-lg bg-purple-50 hover:bg-purple-100 transition">
-                <h4 class="font-semibold text-purple-800">Faculty Management</h4>
-                <p class="text-sm text-purple-700">View and manage all teachers and their assignments.</p>
+            <a href="{{ url_for('dean.dean_faculty') }}" class="block p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
+                <h4 class="font-semibold text-purple-800 dark:text-purple-300">Faculty Management</h4>
+                <p class="text-sm text-purple-700 dark:text-purple-200">View and manage all teachers and their assignments.</p>
             </a>
-            <a href="{{ url_for('dean.dean_courses') }}" class="block p-4 rounded-lg bg-blue-50 hover:bg-blue-100 transition">
-                <h4 class="font-semibold text-blue-800">Course Approvals</h4>
-                <p class="text-sm text-blue-700">Review and approve new courses proposed by faculty.</p>
+            <a href="{{ url_for('dean.dean_courses') }}" class="block p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+                <h4 class="font-semibold text-blue-800 dark:text-blue-300">Course Approvals</h4>
+                <p class="text-sm text-blue-700 dark:text-blue-200">Review and approve new courses proposed by faculty.</p>
             </a>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    function updateNotificationCount() {
-        fetch('{{ url_for('main.check_notifications') }}')
-            .then(response => response.json())
-            .then(data => {
-                const badge = document.getElementById('notification-badge');
-                if (data.unread_count > 0) {
-                    badge.textContent = data.unread_count;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            })
-            .catch(error => console.error('Error fetching notifications:', error));
-    }
-
-    // Call immediately on page load
-    updateNotificationCount();
-    // Set an interval to check every 30 seconds (adjust as needed)
-    setInterval(updateNotificationCount, 30000); // 30 seconds
-</script>
 {% endblock %}

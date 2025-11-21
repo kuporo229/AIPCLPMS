@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ doc_title }}</title>
+  <script src="http://localhost:8080/web-apps/apps/api/documents/api.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col h-screen">
+
+  <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center shadow-sm z-10">
+      <h1 class="text-lg font-bold text-gray-800 dark:text-white truncate">{{ doc_title }}</h1>
+      <a href="{{ url_for('dean.dean_review_clp', plan_id=plan_id) }}" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors">
+          &larr; Back to Review Details
+      </a>
+  </div>
+
+  <div id="editor" class="flex-grow"></div>
+
+  <div id="status" class="fixed top-20 right-5 bg-black bg-opacity-80 text-white px-4 py-2 rounded shadow-lg hidden z-50"></div>
+
+  <script>
+    function showStatus(msg, isError=false) {
+        const el = document.getElementById('status');
+        el.textContent = msg;
+        el.className = `fixed top-20 right-5 px-4 py-2 rounded shadow-lg z-50 text-white ${isError ? 'bg-red-600' : 'bg-green-600'}`;
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    const config = {
+        document: {
+            title: "{{ doc_title }}",
+            url: "{{ doc_url }}",
+            fileType: "docx",
+            key: "{{ doc_key }}",
+            permissions: {
+                edit: true,
+                download: true,
+                review: true
+            }
+        },
+        documentType: "word",
+        editorConfig: {
+            mode: "edit",
+            callbackUrl: "{{ callback_url }}",
+            user: {
+                id: "{{ session.user_id }}",
+                name: "Dean {{ session.username }}"
+            },
+            customization: {
+                autosave: true,
+                forcesave: true
+            }
+        },
+        width: "100%",
+        height: "100%",
+        token: "{{ token }}" || null
+    };
+
+    if (typeof DocsAPI !== 'undefined') {
+        try {
+            new DocsAPI.DocEditor("editor", config);
+        } catch (e) {
+            console.error(e);
+            showStatus("Error initializing editor: " + e.message, true);
+        }
+    } else {
+        document.getElementById('editor').innerHTML = 
+            '<div class="flex items-center justify-center h-full text-red-500">Error: ONLYOFFICE API not reachable.</div>';
+    }
+  </script>
+</body>
+</html>

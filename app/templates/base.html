@@ -4,14 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AI Learning Plan System{% endblock %}</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: {
+                            900: '#111827',
+                            800: '#1f2937',
+                            700: '#374151',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script>
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Loader Styles */
         .loader {
             border: 4px solid #f3f3f3;
             border-radius: 50%;
-            border-top: 4px solid #4f46e5; /* Indigo color */
+            border-top: 4px solid #4f46e5;
             width: 20px;
             height: 20px;
             animation: spin 1s linear infinite;
@@ -20,138 +48,70 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .popup-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .popup-content {
-            background: white;
-            padding: 20px 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            text-align: center;
-        }
-        .table-cell {
-            padding: 8px 12px;
-            border: 1px solid #e5e7eb;
-            vertical-align: top;
-        }
-        .header-cell {
-            background-color: #f9fafb;
-            font-weight: 600;
-            text-align: center;
-        }
-        .center-cell {
-            text-align: center;
-        }
-        .prose-custom {
-            max-width: none;
-            color: #4b5563; /* text-gray-700 */
-            white-space: pre-wrap; /* Preserve formatting for content */
-        }
-        /* --- Custom Landing Page Styles --- */
-        .landing-nav {
-            border-bottom: 1px solid #e5eeeb; /* Light grey border */
-            background-color: white;
-            box-shadow: none; /* Remove default shadow */
-        }
-        .hero-section {
-            padding-top: 5rem; /* Large top padding to push content down */
-            min-height: 80vh; 
-        }
-        .learn-more-section {
-            border-top: 1px solid #f3f4f6; /* Subtle divider */
-            padding-top: 4rem; 
-            padding-bottom: 4rem;
-        }
+        
+        /* Common Utilities */
+        .table-cell { padding: 8px 12px; border: 1px solid #e5e7eb; vertical-align: top; }
+        .header-cell { background-color: #f9fafb; font-weight: 600; text-align: center; }
+        .center-cell { text-align: center; }
+        
+        /* Dark Mode Overrides for specific custom classes */
+        .dark .table-cell { border-color: #374151; }
+        .dark .header-cell { background-color: #1f2937; color: #e5e7eb; }
+        .dark .popup-content { background-color: #1f2937; color: #f3f4f6; }
     </style>
 </head>
-<body class="antialiased">
-    <nav class="bg-white shadow-sm sticky top-0 z-10">
+<body class="antialiased bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+    
+    <nav class="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors duration-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center space-x-4">
                     {% if session.get('role') == 'teacher' %}
-                        <a href="{{ url_for('main.dashboard') }}" class="text-xl font-bold text-indigo-600">Teacher Panel</a>
+                        <a href="{{ url_for('main.dashboard') }}" class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Teacher Panel</a>
                     {% elif session.get('role') == 'dean' %}
-                        <a href="{{ url_for('main.dashboard') }}" class="text-xl font-bold text-purple-600">Dean's Panel</a>
+                        <a href="{{ url_for('main.dashboard') }}" class="text-xl font-bold text-purple-600 dark:text-purple-400">Dean's Panel</a>
                     {% elif session.get('role') == 'admin' %}
-                        <a href="{{ url_for('main.dashboard') }}" class="text-xl font-bold text-indigo-600">Admin Panel</a>
+                        <a href="{{ url_for('main.dashboard') }}" class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Admin Panel</a>
                     {% else %}
-                        <h1 class="text-xl font-bold text-gray-700">AI Learning Plan System</h1>
+                        <a href="/" class="text-xl font-bold text-gray-700 dark:text-gray-200">AI Learning Plan System</a>
                     {% endif %}
                 </div>
-                <div class="flex items-center space-x-2">
+
+                <div class="flex items-center space-x-4">
+                    
+                    <button id="theme-toggle" type="button" class="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:focus:ring-gray-700 rounded-lg text-sm p-2.5">
+                        <svg id="theme-toggle-dark-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                        <svg id="theme-toggle-light-icon" class="hidden w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+                    </button>
+
                     {% if session.get('user_id') %}
-                        <span class="text-gray-800 font-medium mr-4 hidden md:block">Hello, {{ session.username }}</span>
+                        <span class="text-gray-800 dark:text-gray-200 font-medium hidden md:block">Hello, {{ session.username }}</span>
                         
                         {% if session.get('role') == 'teacher' %}
-                            <a href="{{ url_for('teacher.teacher_my_clps') }}" title="My Courses" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100 flex items-center space-x-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>
-                                </svg>
+                            <a href="{{ url_for('teacher.teacher_my_clps') }}" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-1">
                                 <span class="hidden sm:inline">My Plans</span>
                             </a>
-                            <a href="{{ url_for('teacher.teacher_all_clps') }}" title="All Approved Plans" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100 flex items-center space-x-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                                </svg>
-                                <span class="hidden sm:inline">All Plans</span>
-                            </a>
-                            <a href="{{ url_for('main.list_notifications') }}" title="Notifications" class="relative px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100">
+                            <a href="{{ url_for('main.list_notifications') }}" class="relative px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-700">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.248 24.248 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                                 </svg>
                                 <span id="notification-badge" class="absolute top-1 right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full hidden">0</span>
                             </a>
                         {% elif session.get('role') == 'dean' %}
-                            <a href="{{ url_for('dean.dean_faculty') }}" title="Faculty" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-gray-100 flex items-center space-x-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-                                </svg>
-                                <span class="hidden sm:inline">Faculty</span>
-                            </a>
-                            <a href="{{ url_for('dean.dean_courses') }}" title="Manage Courses" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-gray-100 flex items-center space-x-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>
-                                </svg>
-                                <span class="hidden sm:inline">Manage Plans</span>
-                            </a>
-                            <a href="{{ url_for('main.list_notifications') }}" title="Notifications" class="relative px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-purple-600 hover:bg-gray-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.248 24.248 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                                </svg>
-                                <span id="notification-badge" class="absolute top-1 right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full hidden">0</span>
+                            <a href="{{ url_for('dean.dean_courses') }}" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                Manage Plans
                             </a>
                         {% elif session.get('role') == 'admin' %}
-                            <a href="{{ url_for('admin.admin_dashboard') }}" title="Admin Dashboard" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100 flex items-center space-x-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                                </svg>
-                                <span class="hidden sm:inline">Dashboard</span>
+                            <a href="{{ url_for('admin.admin_dashboard') }}" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                Dashboard
                             </a>
                         {% endif %}
 
-                        <a href="{{ url_for('auth.logout') }}" title="Logout" class="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-100 flex items-center space-x-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                                <polyline points="16 17 21 12 16 7"/>
-                                <line x1="21" x2="9" y1="12" y2="12"/>
-                            </svg>
-                            <span class="hidden sm:inline">Logout</span>
+                        <a href="{{ url_for('auth.logout') }}" class="ml-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Logout
                         </a>
+                    {% else %}
+                        <a href="{{ url_for('auth.login') }}" class="text-gray-700 dark:text-gray-200 hover:text-indigo-600 font-medium">Log In</a>
                     {% endif %}
                 </div>
             </div>
@@ -163,7 +123,7 @@
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                    <div class="p-4 mb-4 text-sm text-{{ 'red' if category == 'danger' or category == 'warning' else ('green' if category == 'success' else 'blue') }}-800 bg-{{ 'red' if category == 'danger' or category == 'warning' else ('green' if category == 'success' else 'blue') }}-100 rounded-lg" role="alert">
+                    <div class="p-4 mb-4 text-sm text-{{ 'red' if category == 'danger' or category == 'warning' else ('green' if category == 'success' else 'blue') }}-800 dark:text-{{ 'red' if category == 'danger' or category == 'warning' else ('green' if category == 'success' else 'blue') }}-200 bg-{{ 'red' if category == 'danger' or category == 'warning' else ('green' if category == 'success' else 'blue') }}-100 dark:bg-{{ 'red' if category == 'danger' or category == 'warning' else ('green' if category == 'success' else 'blue') }}-900 rounded-lg" role="alert">
                         {{ message }}
                     </div>
                     {% endfor %}
@@ -175,10 +135,93 @@
         </div>
     </main>
 
-    
     {% block scripts %}
     {% endblock %}
-   
+
+    <script>
+        // --- 1. Dark Mode Toggle Logic ---
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+
+        // Change the icons inside the button based on previous settings
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            lightIcon.classList.remove('hidden');
+        } else {
+            darkIcon.classList.remove('hidden');
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            // toggle icons inside button
+            darkIcon.classList.toggle('hidden');
+            lightIcon.classList.toggle('hidden');
+
+            // if set via local storage previously
+            if (localStorage.getItem('color-theme')) {
+                if (localStorage.getItem('color-theme') === 'light') {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                }
+            } else {
+                // if NOT set via local storage previously
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                }
+            }
+        });
+
+        // --- 2. AI Generation Status Polling ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const statusEl = document.getElementById('ai-generation-status');
+            const statusText = document.getElementById('ai-status-text');
+            let pollInterval;
+
+            function stopPolling() {
+                if (pollInterval) clearInterval(pollInterval);
+                statusEl.classList.add('hidden');
+                localStorage.removeItem('is_generating');
+            }
+
+            function checkStatus() {
+                if (localStorage.getItem('is_generating') !== 'true') return; 
+
+                // Note: Using the teacher blueprint route. 
+                // This might 404 if user isn't logged in, which is fine as catch block handles it.
+                fetch("{{ url_for('teacher.check_generation_status') }}")
+                    .then(response => {
+                        if (response.ok) return response.json();
+                        throw new Error('Network error');
+                    })
+                    .then(data => {
+                        if (data.generating) {
+                            statusEl.classList.remove('hidden');
+                            if (data.plans.length > 0) {
+                                statusText.textContent = `Generating "${data.plans[0].subject}"...`;
+                            }
+                        } else {
+                            console.log("Generation complete.");
+                            stopPolling();
+                            if (window.location.pathname.includes('/my_clps')) {
+                                window.location.reload();
+                            }
+                        }
+                    })
+                    .catch(err => console.log("Status check skipped"));
+            }
+
+            if (localStorage.getItem('is_generating') === 'true') {
+                checkStatus();
+                pollInterval = setInterval(checkStatus, 5000);
+            }
+        });
+    </script>
 
     <div id="ai-generation-status" class="fixed bottom-5 right-5 bg-white border border-gray-200 rounded-lg shadow-xl p-4 flex items-center space-x-4 hidden z-50 transition-all transform translate-y-0">
     <div class="relative">
@@ -192,60 +235,4 @@
 
 
 </body>
- <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const statusEl = document.getElementById('ai-generation-status');
-        const statusText = document.getElementById('ai-status-text');
-        let pollInterval;
-
-        function stopPolling() {
-            if (pollInterval) clearInterval(pollInterval);
-            statusEl.classList.add('hidden');
-            localStorage.removeItem('is_generating'); // Clear flag so it doesn't run again
-        }
-
-        function checkStatus() {
-            // 1. Safety Check: If flag is missing, don't poll.
-            if (localStorage.getItem('is_generating') !== 'true') {
-                return; 
-            }
-
-            fetch("{{ url_for('teacher.check_generation_status') }}")
-                .then(response => {
-                    if (response.ok) return response.json();
-                    throw new Error('Network error');
-                })
-                .then(data => {
-                    if (data.generating) {
-                        // STIL GENERATING: Ensure UI is visible
-                        statusEl.classList.remove('hidden');
-                        
-                        // Update text
-                        const count = data.plans.length;
-                        if (count > 0) {
-                            statusText.textContent = `Generating "${data.plans[0].subject}"...`;
-                        }
-                    } else {
-                        // FINISHED: Stop polling and clean up
-                        console.log("Generation complete.");
-                        stopPolling();
-                        
-                        // If user is on the "My Courses" page, reload to show the new plan
-                        if (window.location.pathname.includes('/my_clps')) {
-                            window.location.reload();
-                        }
-                    }
-                })
-                .catch(err => {
-                    console.log("Status check skipped:", err);
-                });
-        }
-
-        // 2. Initialization: Only start the interval if the flag exists
-        if (localStorage.getItem('is_generating') === 'true') {
-            checkStatus(); // Check immediately
-            pollInterval = setInterval(checkStatus, 5000); // Poll every 5 seconds (gentle)
-        }
-    });
-</script>
 </html>
